@@ -1,0 +1,16 @@
+name = "glitter_ftp"
+version = "0.1.0"
+licenses = ["MIT"]
+description = "A ✨ glitter FTP/FTPS client library for Gleam with full RFC support for both passive and active mode"
+target = "erlang"
+repository = { type = "github", user = "veeso", repo = "glitter_ftp" }
+links = [
+  { title = "Codeberg", href = "https://codeberg.org/veeso/glitter_ftp" },
+]
+gleam = ">= 0.30"
+
+[dependencies]
+gleam_stdlib = ">= 0.44.0 and < 2.0.0"
+
+[dev-dependencies]
+gleeunit = ">= 1.0.0 and < 2.0.0"
