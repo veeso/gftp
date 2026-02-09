@@ -7,7 +7,6 @@ repository = { type = "github", user = "veeso", repo = "glitter_ftp" }
 links = [
   { title = "Codeberg", href = "https://codeberg.org/veeso/glitter_ftp" },
 ]
-gleam = ">= 1.0.0 and < 2.0.0"
 
 [dependencies]
 gleam_stdlib = ">= 0.44.0 and < 2.0.0"
