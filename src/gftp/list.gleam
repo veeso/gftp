@@ -301,6 +301,36 @@ fn re_matches(
   }
 }
 
+/// Resolve the file type for a POSIX LIST entry, filling in the symlink target
+/// when both the type indicator is `l` and the name contained ` -> target`.
+fn resolve_posix_file_type(
+  ft: FileType,
+  symlink_path: Option(String),
+) -> FileType {
+  case ft, symlink_path {
+    file_type.Symlink(_), Some(target) -> file_type.Symlink(target)
+    file_type.Symlink(_), None -> file_type.File
+    _, _ -> ft
+  }
+}
+
+/// Optionally set a field on a File when the value is Some.
+fn maybe_set(
+  f: File,
+  value: Option(a),
+  setter: fn(File, a) -> File,
+) -> File {
+  case value {
+    Some(v) -> setter(f, v)
+    None -> f
+  }
+}
+
+/// Try to parse a string as an Int, returning None on failure.
+fn try_parse_int(s: String) -> Option(Int) {
+  s |> string.trim() |> int.parse() |> option.from_result()
+}
+
 /// Parse a POSIX LIST output line and if it is valid, return a [`File`] instance, otherwise return a [`ParseError`].
 ///
 /// POSIX syntax has the following syntax:
@@ -314,74 +344,41 @@ fn parse_list_posix(line: String) -> ParseResult {
 
   case re_matches(re, line) {
     Ok([
-      Some(file_type),
-      Some(permissions),
+      Some(ft_str),
+      Some(perm_str),
       _link_count,
       Some(user),
       Some(group),
-      Some(size),
-      Some(modified),
-      Some(name),
+      Some(size_str),
+      Some(modified_str),
+      Some(name_str),
     ]) -> {
-      use file_type <- result.try(parse_list_file_type(file_type))
+      use ft <- result.try(parse_list_file_type(ft_str))
       use size <- result.try(
-        size
+        size_str
         |> string.trim()
         |> int.parse()
         |> result.replace_error(BadSize),
       )
-      let permissions = parse_list_permissions(permissions)
       use modified <- result.try(
-        modified
+        modified_str
         |> parse_list_lstime()
         |> result.replace_error(InvalidDate),
       )
-      let uid =
-        user
-        |> string.trim()
-        |> int.parse()
-        |> option.from_result()
-      let gid =
-        group
-        |> string.trim()
-        |> int.parse()
-        |> option.from_result()
       use #(name, symlink_path) <- result.try(parse_list_name_and_link(
-        file_type,
-        name,
+        ft,
+        name_str,
       ))
 
-      let resolved_file_type = fn(
-        file_type: file_type.FileType,
-        symlink_path: Option(String),
-      ) {
-        case file_type {
-          file_type.Symlink(_) ->
-            case symlink_path {
-              Some(target) -> file_type.Symlink(target)
-              None -> file_type.File
-            }
-          _ -> file_type
-        }
-      }
-
-      let f =
-        file.empty()
-        |> file.with_name(name)
-        |> file.with_file_type(resolved_file_type(file_type, symlink_path))
-        |> file.with_size(size)
-        |> file.with_modified(modified)
-        |> file.with_permissions(permissions)
-
-      let f = case uid {
-        Some(uid) -> file.with_uid(f, uid)
-        None -> f
-      }
-      let f = case gid {
-        Some(gid) -> file.with_gid(f, gid)
-        None -> f
-      }
-      Ok(f)
+      file.empty()
+      |> file.with_name(name)
+      |> file.with_file_type(resolve_posix_file_type(ft, symlink_path))
+      |> file.with_size(size)
+      |> file.with_modified(modified)
+      |> file.with_permissions(parse_list_permissions(perm_str))
+      |> maybe_set(try_parse_int(user), file.with_uid)
+      |> maybe_set(try_parse_int(group), file.with_gid)
+      |> Ok
     }
     _ -> Error(SyntaxError)
   }
