@@ -252,238 +252,238 @@ pub fn from_int_unknown_test() {
 // --- description tests ---
 
 pub fn description_restart_marker_test() {
-  status.description(RestartMarker)
+  status.describe_error(RestartMarker)
   |> should.equal("restart marker reply")
 }
 
 pub fn description_ready_minute_test() {
-  status.description(ReadyMinute)
+  status.describe_error(ReadyMinute)
   |> should.equal("service ready in (n) minutes")
 }
 
 pub fn description_already_open_test() {
-  status.description(AlreadyOpen)
+  status.describe_error(AlreadyOpen)
   |> should.equal("data connection already open transfer starting")
 }
 
 pub fn description_about_to_send_test() {
-  status.description(AboutToSend)
+  status.describe_error(AboutToSend)
   |> should.equal("file status okay about to open data connection")
 }
 
 pub fn description_command_ok_test() {
-  status.description(CommandOk)
+  status.describe_error(CommandOk)
   |> should.equal("command okay")
 }
 
 pub fn description_command_not_implemented_test() {
-  status.description(CommandNotImplemented)
+  status.describe_error(CommandNotImplemented)
   |> should.equal("command not implemented")
 }
 
 pub fn description_system_test() {
-  status.description(System)
+  status.describe_error(System)
   |> should.equal("system status or system help reply")
 }
 
 pub fn description_directory_test() {
-  status.description(Directory)
+  status.describe_error(Directory)
   |> should.equal("directory status")
 }
 
 pub fn description_file_test() {
-  status.description(File)
+  status.describe_error(File)
   |> should.equal("file status")
 }
 
 pub fn description_help_test() {
-  status.description(Help)
+  status.describe_error(Help)
   |> should.equal("help message")
 }
 
 pub fn description_name_test() {
-  status.description(Name)
+  status.describe_error(Name)
   |> should.equal("NAME system type")
 }
 
 pub fn description_ready_test() {
-  status.description(Ready)
+  status.describe_error(Ready)
   |> should.equal("service ready for new user")
 }
 
 pub fn description_closing_test() {
-  status.description(Closing)
+  status.describe_error(Closing)
   |> should.equal("service closing control connection")
 }
 
 pub fn description_data_connection_open_test() {
-  status.description(DataConnectionOpen)
+  status.describe_error(DataConnectionOpen)
   |> should.equal("data connection open; no transfer in progress")
 }
 
 pub fn description_closing_data_connection_test() {
-  status.description(ClosingDataConnection)
+  status.describe_error(ClosingDataConnection)
   |> should.equal("closing data connection")
 }
 
 pub fn description_passive_mode_test() {
-  status.description(PassiveMode)
+  status.describe_error(PassiveMode)
   |> should.equal("entering passive mode")
 }
 
 pub fn description_long_passive_mode_test() {
-  status.description(LongPassiveMode)
+  status.describe_error(LongPassiveMode)
   |> should.equal("entering long passive mode")
 }
 
 pub fn description_extended_passive_mode_test() {
-  status.description(ExtendedPassiveMode)
+  status.describe_error(ExtendedPassiveMode)
   |> should.equal("entering extended passive mode")
 }
 
 pub fn description_logged_in_test() {
-  status.description(LoggedIn)
+  status.describe_error(LoggedIn)
   |> should.equal("user logged in proceed. Logged out if appropriate.")
 }
 
 pub fn description_logged_out_test() {
-  status.description(LoggedOut)
+  status.describe_error(LoggedOut)
   |> should.equal("user logged out; service terminated")
 }
 
 pub fn description_logout_ack_test() {
-  status.description(LogoutAck)
+  status.describe_error(LogoutAck)
   |> should.equal("logout command noted will complete when transfer done")
 }
 
 pub fn description_auth_ok_test() {
-  status.description(AuthOk)
+  status.describe_error(AuthOk)
   |> should.equal(
     "specifies that the server accepts the authentication mechanism specified by the client",
   )
 }
 
 pub fn description_requested_file_action_ok_test() {
-  status.description(RequestedFileActionOk)
+  status.describe_error(RequestedFileActionOk)
   |> should.equal("requested file action okay")
 }
 
 pub fn description_path_created_test() {
-  status.description(PathCreated)
+  status.describe_error(PathCreated)
   |> should.equal("pathname created")
 }
 
 pub fn description_need_password_test() {
-  status.description(NeedPassword)
+  status.describe_error(NeedPassword)
   |> should.equal("user name okay need password")
 }
 
 pub fn description_login_need_account_test() {
-  status.description(LoginNeedAccount)
+  status.describe_error(LoginNeedAccount)
   |> should.equal("need account for login")
 }
 
 pub fn description_request_file_pending_test() {
-  status.description(RequestFilePending)
+  status.describe_error(RequestFilePending)
   |> should.equal("requested file action pending further information")
 }
 
 pub fn description_not_available_test() {
-  status.description(NotAvailable)
+  status.describe_error(NotAvailable)
   |> should.equal("service not available closing control connection")
 }
 
 pub fn description_cannot_open_data_connection_test() {
-  status.description(CannotOpenDataConnection)
+  status.describe_error(CannotOpenDataConnection)
   |> should.equal("can't open data connection")
 }
 
 pub fn description_transfer_aborted_test() {
-  status.description(TransferAborted)
+  status.describe_error(TransferAborted)
   |> should.equal("connection closed; transfer aborted")
 }
 
 pub fn description_invalid_credentials_test() {
-  status.description(InvalidCredentials)
+  status.describe_error(InvalidCredentials)
   |> should.equal("invalid username or password")
 }
 
 pub fn description_host_unavailable_test() {
-  status.description(HostUnavailable)
+  status.describe_error(HostUnavailable)
   |> should.equal("requested host unavailable")
 }
 
 pub fn description_request_file_action_ignored_test() {
-  status.description(RequestFileActionIgnored)
+  status.describe_error(RequestFileActionIgnored)
   |> should.equal("requested file action not taken")
 }
 
 pub fn description_action_aborted_test() {
-  status.description(ActionAborted)
+  status.describe_error(ActionAborted)
   |> should.equal("requested action aborted")
 }
 
 pub fn description_requested_action_not_taken_test() {
-  status.description(RequestedActionNotTaken)
+  status.describe_error(RequestedActionNotTaken)
   |> should.equal("requested action not taken")
 }
 
 pub fn description_bad_command_test() {
-  status.description(BadCommand)
+  status.describe_error(BadCommand)
   |> should.equal("syntax error command unrecognized")
 }
 
 pub fn description_bad_arguments_test() {
-  status.description(BadArguments)
+  status.describe_error(BadArguments)
   |> should.equal("syntax error in parameters or arguments")
 }
 
 pub fn description_not_implemented_test() {
-  status.description(NotImplemented)
+  status.describe_error(NotImplemented)
   |> should.equal("comamnd not implemented")
 }
 
 pub fn description_bad_sequence_test() {
-  status.description(BadSequence)
+  status.describe_error(BadSequence)
   |> should.equal("bad sequence of commands")
 }
 
 pub fn description_not_implemented_parameter_test() {
-  status.description(NotImplementedParameter)
+  status.describe_error(NotImplementedParameter)
   |> should.equal("command not implemented for that parameter")
 }
 
 pub fn description_not_logged_in_test() {
-  status.description(NotLoggedIn)
+  status.describe_error(NotLoggedIn)
   |> should.equal("user not logged in")
 }
 
 pub fn description_storing_need_account_test() {
-  status.description(StoringNeedAccount)
+  status.describe_error(StoringNeedAccount)
   |> should.equal("need account for storing files")
 }
 
 pub fn description_file_unavailable_test() {
-  status.description(FileUnavailable)
+  status.describe_error(FileUnavailable)
   |> should.equal("requested action not taken; file unavailable")
 }
 
 pub fn description_page_type_unknown_test() {
-  status.description(PageTypeUnknown)
+  status.describe_error(PageTypeUnknown)
   |> should.equal("requested action aborted; page type unknown")
 }
 
 pub fn description_exceeded_storage_test() {
-  status.description(ExceededStorage)
+  status.describe_error(ExceededStorage)
   |> should.equal("requested file action aborted; execeeded storage allocation")
 }
 
 pub fn description_bad_filename_test() {
-  status.description(BadFilename)
+  status.describe_error(BadFilename)
   |> should.equal("requested action not taken; file name not allowed")
 }
 
 pub fn description_unknown_test() {
-  status.description(Unknown)
+  status.describe_error(Unknown)
   |> should.equal("unknown error code")
 }

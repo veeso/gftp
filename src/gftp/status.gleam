@@ -60,7 +60,7 @@ pub type Status {
 }
 
 /// Converts a status code to its descriptive string representation. This is useful for logging and debugging purposes.
-pub fn description(status: Status) -> String {
+pub fn describe_error(status: Status) -> String {
   case status {
     RestartMarker -> "restart marker reply"
     ReadyMinute -> "service ready in (n) minutes"
