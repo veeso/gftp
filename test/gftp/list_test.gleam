@@ -274,6 +274,16 @@ pub fn parse_mlsd_case_insensitive_type_test() {
   file.size(f) |> should.equal(100)
 }
 
+pub fn parse_mlsd_empty_string_test() {
+  list.parse_mlsd("")
+  |> should.equal(Error(list.SyntaxError))
+}
+
+pub fn parse_mlsd_whitespace_only_test() {
+  list.parse_mlsd("   ")
+  |> should.equal(Error(list.SyntaxError))
+}
+
 pub fn parse_mlsd_invalid_type_test() {
   let line = "type=invalid;size=100; test.txt"
   list.parse_mlsd(line)

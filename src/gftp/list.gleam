@@ -178,13 +178,15 @@ fn parse_mlsd_mlst_tokens(tokens: List(String), file: File) -> ParseResult {
   }
 }
 
-/// Parse any line from a `MLSD` or `MLST` command output, 
+/// Parse any line from a `MLSD` or `MLST` command output,
 /// returning a `File` data structure with the extracted metadata on success, or a `ParseError` on failure.
 fn parse_mlsd_mlst_line(line: String) -> ParseResult {
-  let tokens = string.split(line, ";")
-  case list.is_empty(tokens) {
-    True -> Error(SyntaxError)
-    False -> parse_mlsd_mlst_tokens(tokens, file.empty())
+  case string.trim(line) {
+    "" -> Error(SyntaxError)
+    trimmed ->
+      trimmed
+      |> string.split(";")
+      |> parse_mlsd_mlst_tokens(file.empty())
   }
 }
 
