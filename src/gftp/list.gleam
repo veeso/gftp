@@ -318,11 +318,7 @@ fn resolve_posix_file_type(
 }
 
 /// Optionally set a field on a File when the value is Some.
-fn maybe_set(
-  f: File,
-  value: Option(a),
-  setter: fn(File, a) -> File,
-) -> File {
+fn maybe_set(f: File, value: Option(a), setter: fn(File, a) -> File) -> File {
   case value {
     Some(v) -> setter(f, v)
     None -> f
