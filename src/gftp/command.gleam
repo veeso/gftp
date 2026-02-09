@@ -103,7 +103,7 @@ fn encode_eprt(host: String, port: Int, ip_version: IpVersion) -> String {
   |> string.join("|")
 }
 
-pub fn encode_command(command: Command) -> String {
+pub fn to_string(command: Command) -> String {
   case command {
     Abor -> "ABOR"
     Appe(f) -> "APPE " <> f
