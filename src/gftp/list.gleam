@@ -85,9 +85,12 @@ pub fn parse_mlst(line: String) -> ParseResult {
 /// The parser will first attempt to parse the line as POSIX format,
 /// and if that fails, it will attempt to parse it as DOS format.
 pub fn parse_list(line: String) -> ParseResult {
+  let assert Ok(posix_re) = regexp.from_string(posix_list_regex)
+  let assert Ok(dos_re) = regexp.from_string(dos_list_regex)
+
   line
-  |> parse_list_posix
-  |> result.or(parse_list_dos(line))
+  |> parse_list_posix(posix_re)
+  |> result.or(parse_list_dos(line, dos_re))
 }
 
 /// Parse MLSD and MLST date formats, which is in the form of `%Y%m%d%H%M%S`
@@ -339,9 +342,7 @@ fn try_parse_int(s: String) -> Option(Int) {
 /// {FILE_TYPE}{PERMISSIONS} {LINK_COUNT} {USER} {GROUP} {FILE_SIZE} {MODIFIED_TIME} {FILENAME}
 /// -rw-r--r-- 1 user group 1234 Nov 5 13:46 example.txt
 /// ```
-fn parse_list_posix(line: String) -> ParseResult {
-  let assert Ok(re) = regexp.from_string(posix_list_regex)
-
+fn parse_list_posix(line: String, re: regexp.Regexp) -> ParseResult {
   case re_matches(re, line) {
     Ok([
       Some(ft_str),
@@ -405,9 +406,7 @@ fn parse_list_dos_time(token: String) -> Result(Timestamp, ParseError) {
 /// 10-19-20  03:19PM <DIR> pub
 /// 04-08-14  03:09PM 403   readme.txt
 /// ```
-fn parse_list_dos(line: String) -> ParseResult {
-  let assert Ok(re) = regexp.from_string(dos_list_regex)
-
+fn parse_list_dos(line: String, re: regexp.Regexp) -> ParseResult {
   case re_matches(re, line) {
     Ok([Some(modified), file_type, size, Some(name)]) -> {
       use modified <- result.try(
