@@ -35,10 +35,17 @@ import gleam/string
 import gleam/time/timestamp.{type Timestamp}
 import tempo
 import tempo/datetime
+import tempo/naive_datetime
 
 const posix_list_regex = "^([\\-ld])([\\-rwxsStT]{9})\\s+(\\d+)\\s+([^ ]+)\\s+([^ ]+)\\s+(\\d+)\\s+([^ ]+\\s+\\d{1,2}\\s+(?:\\d{1,2}:\\d{1,2}|\\d{4}))\\s+(.+)$"
 
 const dos_list_regex = "^(\\d{2}\\-\\d{2}\\-\\d{2}\\s+\\d{2}:\\d{2}\\s*[AP]M)\\s+(<DIR>)?([\\d,]*)\\s+(.+)$"
+
+/// Collapse multiple consecutive whitespace characters into a single space.
+fn normalize_whitespace(input: String) -> String {
+  let assert Ok(re) = regexp.from_string("\\s+")
+  regexp.replace(re, input, " ")
+}
 
 /// The result of parsing a line from a `LIST`, `MLSD`, or `MLST` command output.
 pub type ParseResult =
@@ -85,9 +92,10 @@ pub fn parse_list(line: String) -> ParseResult {
 
 /// Parse MLSD and MLST date formats, which is in the form of `%Y%m%d%H%M%S`
 fn parse_mlsd_mlst_time(date_str: String) -> Result(Timestamp, ParseError) {
-  let dateformat = tempo.Custom(format: "YYYYMMDDHHmmSS")
+  let dateformat = tempo.CustomNaive(format: "YYYYMMDDHHmmss")
   date_str
-  |> datetime.parse(dateformat)
+  |> naive_datetime.parse(dateformat)
+  |> result.map(naive_datetime.as_utc)
   |> result.map(datetime.to_timestamp)
   |> result.map_error(fn(_) { InvalidDate })
 }
@@ -155,7 +163,8 @@ fn parse_mlsd_mlst_token(key: String, value: String, file: File) -> ParseResult 
 fn parse_mlsd_mlst_tokens(tokens: List(String), file: File) -> ParseResult {
   case tokens {
     [] -> Ok(file)
-    [filename] -> parse_mlsd_mlst_tokens([], file.with_name(file, filename))
+    [filename] ->
+      parse_mlsd_mlst_tokens([], file.with_name(file, string.trim(filename)))
     [token, ..rest] -> {
       let assert [key, value] = string.split(token, "=")
       case parse_mlsd_mlst_token(key, value, file) {
@@ -223,19 +232,29 @@ fn parse_list_permissions(token: String) -> FilePermissions {
 /// Parse the last modification time from a POSIX LIST output line, which can be in one of two formats: `MMM D YYYY` (e.g. `Nov 5 2020`)
 /// or `MMM D HH:mm` (e.g. `Nov 5 13:46`). The parser will first try to parse the date using the year format, and if that fails, it will try to parse it using the time format.
 fn parse_list_lstime(token: String) -> Result(Timestamp, ParseError) {
-  let fmt_year = tempo.Custom(format: "MMM D YYYY")
-  let fmt_time = tempo.Custom(format: "MMM D HH:mm")
-
-  let parse = fn(token, fmt: tempo.DateTimeFormat) {
+  let normalized =
     token
     |> string.trim()
-    |> datetime.parse(fmt)
-    |> result.map(datetime.to_timestamp)
-  }
+    |> normalize_whitespace()
 
-  token
-  |> parse(fmt_year)
-  |> result.or(parse(token, fmt_time))
+  // Try year format first: "Nov 5 2020" -> "Nov 5 2020 00:00" (add default time)
+  let fmt_year = tempo.CustomNaive(format: "MMM D YYYY HH:mm")
+  let year_result =
+    { normalized <> " 00:00" }
+    |> naive_datetime.parse(fmt_year)
+    |> result.map(naive_datetime.as_utc)
+    |> result.map(datetime.to_timestamp)
+
+  // Try time format: "Nov 5 13:46" -> "1970 Nov 5 13:46" (add default year)
+  let fmt_time = tempo.CustomNaive(format: "YYYY MMM D HH:mm")
+  let time_result =
+    { "1970 " <> normalized }
+    |> naive_datetime.parse(fmt_time)
+    |> result.map(naive_datetime.as_utc)
+    |> result.map(datetime.to_timestamp)
+
+  year_result
+  |> result.or(time_result)
   |> result.map_error(fn(_) { InvalidDate })
 }
 
@@ -312,18 +331,16 @@ fn parse_list_posix(line: String) -> ParseResult {
         |> parse_list_lstime()
         |> result.replace_error(InvalidDate),
       )
-      use uid <- result.try(
+      let uid =
         user
         |> string.trim()
         |> int.parse()
-        |> result.replace_error(SyntaxError),
-      )
-      use gid <- result.try(
+        |> option.from_result()
+      let gid =
         group
         |> string.trim()
         |> int.parse()
-        |> result.replace_error(SyntaxError),
-      )
+        |> option.from_result()
       use #(name, symlink_path) <- result.try(parse_list_name_and_link(
         file_type,
         name,
@@ -336,22 +353,30 @@ fn parse_list_posix(line: String) -> ParseResult {
         case file_type {
           file_type.Symlink(_) ->
             case symlink_path {
-              Some(_) -> file_type
+              Some(target) -> file_type.Symlink(target)
               None -> file_type.File
             }
           _ -> file_type
         }
       }
 
-      file.empty()
-      |> file.with_name(name)
-      |> file.with_file_type(resolved_file_type(file_type, symlink_path))
-      |> file.with_size(size)
-      |> file.with_modified(modified)
-      |> file.with_permissions(permissions)
-      |> file.with_uid(uid)
-      |> file.with_gid(gid)
-      |> Ok
+      let f =
+        file.empty()
+        |> file.with_name(name)
+        |> file.with_file_type(resolved_file_type(file_type, symlink_path))
+        |> file.with_size(size)
+        |> file.with_modified(modified)
+        |> file.with_permissions(permissions)
+
+      let f = case uid {
+        Some(uid) -> file.with_uid(f, uid)
+        None -> f
+      }
+      let f = case gid {
+        Some(gid) -> file.with_gid(f, gid)
+        None -> f
+      }
+      Ok(f)
     }
     _ -> Error(SyntaxError)
   }
@@ -359,10 +384,12 @@ fn parse_list_posix(line: String) -> ParseResult {
 
 /// Parse a date and time in the format used by DOS LIST output, which is typically `MM-DD-YY hh:mmA` (e.g. `10-19-20 03:19PM`).
 fn parse_list_dos_time(token: String) -> Result(Timestamp, ParseError) {
-  let fmt = tempo.Custom(format: "MM-DD-YY hh:mmA")
+  let fmt = tempo.CustomNaive(format: "MM-DD-YY hh:mmA")
   token
   |> string.trim()
-  |> datetime.parse(fmt)
+  |> normalize_whitespace()
+  |> naive_datetime.parse(fmt)
+  |> result.map(naive_datetime.as_utc)
   |> result.map(datetime.to_timestamp)
   |> result.map_error(fn(_) { InvalidDate })
 }
