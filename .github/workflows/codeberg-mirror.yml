@@ -12,6 +12,6 @@ jobs:
       - name: "Mirror to Codeberg"
         uses: yesolutions/mirror-action@v0.7.0
         with:
-          REMOTE: "ssh://git@codeberg.org/veeso/glitter_ftp.git"
+          REMOTE: "ssh://git@codeberg.org/veeso/gftp.git"
           GIT_SSH_PRIVATE_KEY: ${{ secrets.GIT_SSH_PRIVATE_KEY }}
           GIT_SSH_NO_VERIFY_HOST: "true"

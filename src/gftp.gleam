@@ -1,5 +1,5 @@
 import gleam/io
 
 pub fn main() -> Nil {
-  io.println("Hello from glitter_ftp!")
+  io.println("Hello from gftp!")
 }
