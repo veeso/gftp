@@ -1,5 +1,5 @@
 import gftp/command/file_type.{
-  Ascii, Asa, Binary, Default, Ebcdic, Image, Local, NonPrint, Telnet,
+  Asa, Ascii, Binary, Default, Ebcdic, Image, Local, NonPrint, Telnet,
 }
 import gleeunit/should
 
