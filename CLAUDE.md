@@ -38,3 +38,5 @@ src/
 - Test files mirror source structure under `test/` with a `_test` suffix (e.g., `test/gftp/command_test.gleam`).
 - Test functions must end with `_test` (gleeunit convention).
 - Use `gleam/option.{type Option}` for optional command parameters (e.g., `List(Option(String))`).
+- Always run `gleam format` before committing to ensure consistent code style.
+- Always commits using conventional commit messages (e.g., `feat: add new FTP command`, `fix: correct command encoding`, `test: add tests for command encoding`).

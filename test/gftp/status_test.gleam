@@ -3,12 +3,12 @@ import gftp/status.{
   BadFilename, BadSequence, CannotOpenDataConnection, Closing,
   ClosingDataConnection, CommandNotImplemented, CommandOk, DataConnectionOpen,
   Directory, ExceededStorage, ExtendedPassiveMode, File, FileUnavailable, Help,
-  HostUnavailable, InvalidCredentials, LoggedIn, LoggedOut, LogoutAck,
-  LongPassiveMode, LoginNeedAccount, Name, NeedPassword, NotAvailable,
-  NotImplemented, NotImplementedParameter, NotLoggedIn, PageTypeUnknown,
-  PassiveMode, PathCreated, Ready, ReadyMinute, RequestFilePending,
-  RequestFileActionIgnored, RequestedActionNotTaken, RequestedFileActionOk,
-  RestartMarker, StoringNeedAccount, System, TransferAborted, Unknown,
+  HostUnavailable, InvalidCredentials, LoggedIn, LoggedOut, LoginNeedAccount,
+  LogoutAck, LongPassiveMode, Name, NeedPassword, NotAvailable, NotImplemented,
+  NotImplementedParameter, NotLoggedIn, PageTypeUnknown, PassiveMode,
+  PathCreated, Ready, ReadyMinute, RequestFileActionIgnored, RequestFilePending,
+  RequestedActionNotTaken, RequestedFileActionOk, RestartMarker,
+  StoringNeedAccount, System, TransferAborted, Unknown,
 }
 import gleeunit/should
 
