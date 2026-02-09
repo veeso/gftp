@@ -166,10 +166,13 @@ fn parse_mlsd_mlst_tokens(tokens: List(String), file: File) -> ParseResult {
     [filename] ->
       parse_mlsd_mlst_tokens([], file.with_name(file, string.trim(filename)))
     [token, ..rest] -> {
-      let assert [key, value] = string.split(token, "=")
-      case parse_mlsd_mlst_token(key, value, file) {
-        Ok(updated_file) -> parse_mlsd_mlst_tokens(rest, updated_file)
-        Error(error) -> Error(error)
+      case string.split(token, "=") {
+        [key, value] ->
+          case parse_mlsd_mlst_token(key, value, file) {
+            Ok(updated_file) -> parse_mlsd_mlst_tokens(rest, updated_file)
+            Error(error) -> Error(error)
+          }
+        _ -> Error(SyntaxError)
       }
     }
   }

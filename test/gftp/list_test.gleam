@@ -286,6 +286,12 @@ pub fn parse_mlsd_invalid_size_test() {
   |> should.equal(Error(list.BadSize))
 }
 
+pub fn parse_mlsd_malformed_token_without_equals_test() {
+  let line = "type=file;badtoken;size=100; test.txt"
+  list.parse_mlsd(line)
+  |> should.equal(Error(list.SyntaxError))
+}
+
 pub fn parse_mlst_file_test() {
   let line = "type=file;size=2048;modify=20220315100000; report.pdf"
   let assert Ok(f) = list.parse_mlst(line)
