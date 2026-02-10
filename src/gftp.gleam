@@ -40,7 +40,7 @@ import gleam/option.{type Option, None, Some}
 import gleam/regexp
 import gleam/result
 import gleam/string
-import gleam/time/calendar.{type Date}
+import gleam/time/calendar
 import gleam/time/timestamp.{type Timestamp}
 import kafein
 import mug
