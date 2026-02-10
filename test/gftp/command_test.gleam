@@ -1,8 +1,8 @@
 import gftp/command.{
   Abor, Appe, Auth, Cdup, ClearCommandChannel, Custom, Cwd, Dele, Eprt, Epsv,
   Feat, List, Mdtm, Mkd, Mlsd, Mlst, Nlst, Noop, Opts, Pass, Pasv, Pbsz, Port,
-  Prot, Pwd, Quit, RenameFrom, RenameTo, Rest, Retr, Rmd, Site, Size, Store,
-  Type, User, V4, V6,
+  Prot, Pwd, Quit, RenameFrom, RenameTo, Rest, Retr, Rmd, Site, Size, Stor, Type,
+  User, V4, V6,
 }
 import gftp/command/file_type
 import gftp/command/protection_level
@@ -205,7 +205,7 @@ pub fn encode_size_test() {
 }
 
 pub fn encode_store_test() {
-  command.to_string(Store("upload.bin"))
+  command.to_string(Stor("upload.bin"))
   |> should.equal("STOR upload.bin")
 }
 
