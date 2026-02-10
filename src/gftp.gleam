@@ -1005,12 +1005,10 @@ fn finalize_data_command(
   ftp_client: FtpClient,
   data_stream: DataStream,
 ) -> FtpResult(Nil) {
-  // close the data stream after the reader is done
-  use _ <- result.try(
-    data_stream
-    |> stream.shutdown
-    |> result.map_error(ftp_result.Socket),
-  )
+  // Close the data stream after the reader/writer is done.
+  // Ignore shutdown errors (e.g. Enotconn) since the server may have already
+  // closed the data connection, which is normal FTP behavior after data transfer.
+  let _ = stream.shutdown(data_stream)
   // read the final response from the server after the data transfer is complete
   read_response_in(ftp_client, [
     status.ClosingDataConnection,

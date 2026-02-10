@@ -1,5 +1,5 @@
 -module(test_container_ffi).
--export([start_ftp_container/0, get_ftp_port/1, stop_container/1]).
+-export([start_ftp_container/0, get_ftp_port/1, get_mapped_port/2, stop_container/1]).
 
 -define(IMAGE, "delfer/alpine-ftp-server:latest").
 
@@ -9,16 +9,23 @@ start_ftp_container() ->
         " | xargs docker rm -f 2>/dev/null; true", 10000),
     Cmd = "docker run -d"
         " -e \"USERS=test|test|/home/test\""
-        " -e ADDRESS=localhost"
-        " -P"
+        " -e ADDRESS=127.0.0.1"
+        " -e MIN_PORT=21100"
+        " -e MAX_PORT=21110"
+        " -p 2121:21"
+        " -p 21100-21110:21100-21110"
         " " ?IMAGE,
     ContainerId = string:trim(cmd(Cmd, 60000)),
     wait_for_ready(ContainerId, 30),
     list_to_binary(ContainerId).
 
-get_ftp_port(ContainerId) ->
+get_ftp_port(_ContainerId) ->
+    2121.
+
+get_mapped_port(ContainerId, ContainerPort) ->
     Output = string:trim(cmd(
-        "docker port " ++ binary_to_list(ContainerId) ++ " 21", 5000)),
+        "docker port " ++ binary_to_list(ContainerId) ++ " "
+        ++ integer_to_list(ContainerPort), 5000)),
     FirstLine = hd(string:split(Output, "\n")),
     [_, PortStr] = string:split(FirstLine, ":", trailing),
     list_to_integer(string:trim(PortStr)).
