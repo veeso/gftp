@@ -772,20 +772,24 @@ fn read_response_in(
   use line <- result.try(read_line(ftp_client))
   use status <- result.try(status_from_bytes(line))
 
-  // make expected lines
-  let first_3_bytes = line |> string.slice(0, 3) |> bit_array.from_string
-  let default_expected = bit_array.append(first_3_bytes, <<0x20>>)
-  let expected = case list.contains(expected_statuses, status.System) {
-    True -> [
-      bit_array.append(first_3_bytes, <<"-":utf8>>),
-      default_expected,
-    ]
-    False -> [default_expected]
-  }
+  // In FTP, single-line responses have a space as the 4th character (e.g. "220 Ok"),
+  // while multi-line responses use a dash (e.g. "220-First line").
+  let is_multiline = string.slice(line, 3, 1) == "-"
 
-  use body <- result.try(read_response_body([line], ftp_client, expected))
+  use body <- result.try(case is_multiline {
+    False -> Ok([line])
+    True -> {
+      let first_3_bytes = line |> string.slice(0, 3) |> bit_array.from_string
+      let final_line = bit_array.append(first_3_bytes, <<0x20>>)
+      let expected = case list.contains(expected_statuses, status.System) {
+        True -> [bit_array.append(first_3_bytes, <<"-":utf8>>), final_line]
+        False -> [final_line]
+      }
+      read_response_body([line], ftp_client, expected)
+    }
+  })
+
   let body = body |> list.map(bit_array.from_string) |> bit_array.concat
-
   Ok(Response(status, body))
 }
 
@@ -848,6 +852,7 @@ fn status_from_bytes(line: String) -> FtpResult(Status) {
 fn perform(ftp_client: FtpClient, command: Command) -> FtpResult(Nil) {
   command
   |> command.to_string
+  |> fn(s) { s <> "\r\n" }
   |> bit_array.from_string
   |> fn(data) { stream.send(ftp_client.data_stream, data) }
   |> result.map_error(ftp_result.Socket)
