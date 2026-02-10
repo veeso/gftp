@@ -55,6 +55,24 @@ pub fn receive_tcp_test() {
   Nil
 }
 
+pub fn receive_exact_tcp_test() {
+  let listen_socket = listen()
+  let port = listen_port(listen_socket)
+  let client_socket = connect_client(port)
+  let server_socket = accept(listen_socket)
+
+  server_send(server_socket, <<"hello world":utf8>>)
+
+  stream.receive_exact(Tcp(client_socket), 1, 5000)
+  |> should.be_ok()
+  |> should.equal(<<"h":utf8>>)
+
+  close_server(server_socket)
+  close_listen(listen_socket)
+  let _ = stream.shutdown(Tcp(client_socket))
+  Nil
+}
+
 pub fn send_tcp_test() {
   let listen_socket = listen()
   let port = listen_port(listen_socket)

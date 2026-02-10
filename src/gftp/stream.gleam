@@ -29,6 +29,21 @@ pub fn receive(stream: DataStream, timeout: Int) -> Result(BitArray, mug.Error) 
   }
 }
 
+/// Receive an exact number of bytes from the peer.
+/// 
+/// Errors if the socket is closed, if the timeout is reached, or if any other error occurs during the receive operation.
+/// The error is returned as a [`mug.Error`]. In case of success, it returns the received data as a `BitArray`.
+pub fn receive_exact(
+  stream,
+  size: Int,
+  timeout: Int,
+) -> Result(BitArray, mug.Error) {
+  case stream {
+    Ssl(ssl_socket) -> kafein.receive_exact(ssl_socket, size, timeout)
+    Tcp(tcp_socket) -> mug.receive_exact(tcp_socket, size, timeout)
+  }
+}
+
 /// Sends data over the provided stream.
 /// It handles both SSL and TCP streams, abstracting away the differences between them.
 /// 
