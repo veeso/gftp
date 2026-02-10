@@ -36,6 +36,7 @@ src/
 ## Conventions
 
 - Test files mirror source structure under `test/` with a `_test` suffix (e.g., `test/gftp/command_test.gleam`).
+- Integration tests must be run by setting `GFTP_INTEGRATION_TESTS=1` in the environment.
 - Test functions must end with `_test` (gleeunit convention).
 - Use `gleam/option.{type Option}` for optional command parameters (e.g., `List(Option(String))`).
 - Always run `gleam format` before committing to ensure consistent code style.
