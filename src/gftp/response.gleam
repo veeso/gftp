@@ -24,3 +24,7 @@ pub fn describe(response: Response) -> String {
   <> "] "
   <> message_to_string(response.message)
 }
+
+pub fn to_string(response: Response) -> Result(String, Nil) {
+  bit_array.to_string(response.message)
+}

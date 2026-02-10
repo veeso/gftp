@@ -26,6 +26,7 @@
 import gftp/list/file.{type File}
 import gftp/list/file_type.{type FileType}
 import gftp/list/permission.{type FilePermissions, FilePermissions}
+import gftp/utils.{re_matches}
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -286,21 +287,6 @@ fn parse_list_name_and_link(
       |> string.split(" -> ")
       |> get_name_and_link
     _ -> Ok(#(token, None))
-  }
-}
-
-/// A helper function to match a regular expression against a string and extract the submatches as a list of strings.
-fn re_matches(
-  re: regexp.Regexp,
-  line: String,
-) -> Result(List(Option(String)), ParseError) {
-  case regexp.scan(re, line) {
-    [] -> Error(SyntaxError)
-    matches ->
-      matches
-      |> list.map(fn(match) { match.submatches })
-      |> list.flatten()
-      |> Ok
   }
 }
 

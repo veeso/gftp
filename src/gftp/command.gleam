@@ -77,7 +77,7 @@ pub type Command {
   /// Get file size of specified path
   Size(String)
   /// Put file at specified path
-  Store(String)
+  Stor(String)
   /// Set transfer file type
   Type(FileType)
   /// Provide user to login as
@@ -154,7 +154,7 @@ pub fn to_string(command: Command) -> String {
     Rmd(p) -> "RMD " <> p
     Site(p) -> "SITE " <> p
     Size(p) -> "SIZE " <> p
-    Store(p) -> "STOR " <> p
+    Stor(p) -> "STOR " <> p
     Type(t) -> "TYPE " <> file_type.to_string(t)
     User(u) -> "USER " <> u
     Custom(c) -> c
