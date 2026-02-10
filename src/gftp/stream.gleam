@@ -14,7 +14,9 @@ fn patch_wrap_options(options: WrapOptions) -> WrapOptions
 
 /// Data Stream used for communications. It can be both of type Tcp in case of plain communication or Ssl in case of FTPS
 pub type DataStream {
-  Ssl(kafein.SslSocket)
+  /// Contains the SSL socket and the underlying TCP socket.
+  /// The TCP socket is necessary in case we want to switch back to a plain TCP stream.
+  Ssl(ssl: kafein.SslSocket, tcp: mug.Socket)
   Tcp(mug.Socket)
 }
 
@@ -24,7 +26,7 @@ pub type DataStream {
 /// The error is returned as a [`mug.Error`]. In case of success, it returns the received data as a `BitArray`.
 pub fn receive(stream: DataStream, timeout: Int) -> Result(BitArray, mug.Error) {
   case stream {
-    Ssl(ssl_socket) -> kafein.receive(ssl_socket, timeout)
+    Ssl(ssl_socket, _) -> kafein.receive(ssl_socket, timeout)
     Tcp(tcp_socket) -> mug.receive(tcp_socket, timeout)
   }
 }
@@ -39,7 +41,7 @@ pub fn receive_exact(
   timeout: Int,
 ) -> Result(BitArray, mug.Error) {
   case stream {
-    Ssl(ssl_socket) -> kafein.receive_exact(ssl_socket, size, timeout)
+    Ssl(ssl_socket, _) -> kafein.receive_exact(ssl_socket, size, timeout)
     Tcp(tcp_socket) -> mug.receive_exact(tcp_socket, size, timeout)
   }
 }
@@ -50,7 +52,7 @@ pub fn receive_exact(
 /// Returns a Result indicating success (`Nil`) or an error ([`mug.Error`]) if the send operation fails.
 pub fn send(stream: DataStream, data: BitArray) -> Result(Nil, mug.Error) {
   case stream {
-    Ssl(ssl_socket) -> kafein.send(ssl_socket, data)
+    Ssl(ssl_socket, _) -> kafein.send(ssl_socket, data)
     Tcp(tcp_socket) -> mug.send(tcp_socket, data)
   }
 }
@@ -61,13 +63,21 @@ pub fn upgrade_to_ssl(
   options: WrapOptions,
 ) -> Result(DataStream, kafein.Error) {
   case stream {
-    Ssl(_) -> Ok(stream)
+    Ssl(_, _) -> Ok(stream)
     // Already an SSL stream, return as is
     Tcp(tcp_socket) ->
       case kafein.wrap(patch_wrap_options(options), tcp_socket) {
-        Ok(ssl_socket) -> Ok(Ssl(ssl_socket))
+        Ok(ssl_socket) -> Ok(Ssl(ssl: ssl_socket, tcp: tcp_socket))
         Error(e) -> Error(e)
       }
+  }
+}
+
+/// Downgrades an SSL stream to a TCP stream. If the stream is already a TCP stream, it returns it as is.
+pub fn downgrade_to_tcp(stream: DataStream) -> DataStream {
+  case stream {
+    Ssl(_, tcp_socket) -> Tcp(tcp_socket)
+    Tcp(_) -> stream
   }
 }
 
@@ -75,7 +85,7 @@ pub fn upgrade_to_ssl(
 /// It abstracts away the differences between the two types of streams and provides a unified interface for shutting them down.
 pub fn shutdown(stream: DataStream) -> Result(Nil, mug.Error) {
   case stream {
-    Ssl(ssl_socket) -> kafein.shutdown(ssl_socket)
+    Ssl(ssl_socket, _) -> kafein.shutdown(ssl_socket)
     Tcp(tcp_socket) -> mug.shutdown(tcp_socket)
   }
 }
