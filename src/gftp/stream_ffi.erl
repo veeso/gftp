@@ -2,7 +2,8 @@
 
 -export([patch_wrap_options/1,
          set_tcp_packet_line/1, set_tcp_packet_raw/1,
-         set_ssl_packet_line/1, set_ssl_packet_raw/1]).
+         set_ssl_packet_line/1, set_ssl_packet_raw/1,
+         local_address/1]).
 
 %% Workaround for kafein bug: kafein passes the server_name_indication as a
 %% binary to ssl:connect, but Erlang's ssl module expects a charlist.
@@ -32,3 +33,11 @@ set_ssl_packet_line(Socket) ->
 set_ssl_packet_raw(Socket) ->
     ssl:setopts(Socket, [{packet, raw}]),
     nil.
+
+local_address(Socket) ->
+    case inet:sockname(Socket) of
+        {ok, {Addr, Port}} ->
+            {ok, {list_to_binary(inet:ntoa(Addr)), Port}};
+        {error, Reason} ->
+            {error, Reason}
+    end.

@@ -24,6 +24,9 @@ fn set_ssl_packet_line(socket: kafein.SslSocket) -> Nil
 @external(erlang, "stream_ffi", "set_ssl_packet_raw")
 fn set_ssl_packet_raw(socket: kafein.SslSocket) -> Nil
 
+@external(erlang, "stream_ffi", "local_address")
+fn tcp_local_address(socket: mug.Socket) -> Result(#(String, Int), mug.Error)
+
 /// Data Stream used for communications. It can be both of type Tcp in case of plain communication or Ssl in case of FTPS
 pub type DataStream {
   /// Contains the SSL socket and the underlying TCP socket.
@@ -91,6 +94,14 @@ pub fn downgrade_to_tcp(stream: DataStream) -> DataStream {
   case stream {
     Ssl(_, tcp_socket, host, port) -> Tcp(tcp_socket, host, port)
     Tcp(_, _, _) -> stream
+  }
+}
+
+/// Retrieves the local address (IP and port) of the underlying TCP socket.
+pub fn local_address(stream: DataStream) -> Result(#(String, Int), mug.Error) {
+  case stream {
+    Ssl(_, tcp_socket, _, _) -> tcp_local_address(tcp_socket)
+    Tcp(tcp_socket, _, _) -> tcp_local_address(tcp_socket)
   }
 }
 

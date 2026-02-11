@@ -62,6 +62,7 @@ import gftp/command.{type Command}
 import gftp/command/feat.{type Features}
 import gftp/command/file_type
 import gftp/command/protection_level
+import gftp/listener
 import gftp/mode.{type Mode}
 import gftp/response.{type Response, Response}
 import gftp/result.{type FtpResult} as ftp_result
@@ -966,11 +967,57 @@ fn data_command(
 
 /// Execute a data command in active mode, which requires the client to listen for an incoming connection from the server for the data transfer.
 fn data_command_active(
-  _ftp_client: FtpClient,
-  _command: Command,
-  _timeout: Int,
+  ftp_client: FtpClient,
+  command: Command,
+  timeout: Int,
 ) -> FtpResult(DataStream) {
-  todo as "Requires additional libs"
+  // Create a TCP listener on an ephemeral port
+  use listen_socket <- result.try(
+    listener.listen()
+    |> result.map_error(ftp_result.Socket),
+  )
+  // Get the assigned port
+  use listen_port <- result.try(
+    listener.port(listen_socket)
+    |> result.map_error(ftp_result.Socket),
+  )
+  // Get the local IP of the control connection
+  use #(local_ip, _) <- result.try(
+    stream.local_address(ftp_client.data_stream)
+    |> result.map_error(ftp_result.Socket),
+  )
+  // Send PORT command with the local IP and port
+  let port_string = build_active_port_arg(local_ip, listen_port)
+  use _ <- result.try(perform(ftp_client, command.Port(port_string)))
+  use _ <- result.try(read_response(ftp_client, status.CommandOk))
+  // Send the actual data command (RETR, STOR, etc.)
+  use _ <- result.try(perform(ftp_client, command))
+  // Accept the incoming connection from the server
+  let accept_result =
+    listener.accept(listen_socket, timeout)
+    |> result.map_error(ftp_result.Socket)
+  // Always close the listener
+  listener.close(listen_socket)
+  use accepted_socket <- result.try(accept_result)
+  // Wrap as a DataStream
+  let data_stream = stream.Tcp(accepted_socket, local_ip, listen_port)
+  // Upgrade to TLS if configured
+  case ftp_client.tls_options {
+    Some(ssl_options) ->
+      data_stream
+      |> stream.upgrade_to_ssl(ssl_options)
+      |> result.map_error(ftp_result.Tls)
+    None -> Ok(data_stream)
+  }
+}
+
+/// Build the PORT command argument string from an IP address and port.
+/// Format: "h1,h2,h3,h4,p1,p2" where h1-h4 are IP octets and p1,p2 are port MSB,LSB.
+fn build_active_port_arg(ip: String, port: Int) -> String {
+  let ip_part = string.replace(ip, ".", ",")
+  let msb = port / 256
+  let lsb = port % 256
+  ip_part <> "," <> int.to_string(msb) <> "," <> int.to_string(lsb)
 }
 
 /// Execute a data command in passive mode, which requires the client to connect to the server at the specified address

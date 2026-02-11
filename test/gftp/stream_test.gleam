@@ -147,3 +147,18 @@ pub fn socket_address_tcp_test() {
   let address = stream.socket_address(Tcp(client_socket, "127.0.0.1", port))
   assert address == #("127.0.0.1", port)
 }
+
+pub fn local_address_tcp_test() {
+  let listen_socket = listen()
+  let port = listen_port(listen_socket)
+  let client_socket = connect_client(port)
+
+  let assert Ok(#(ip, local_port)) =
+    stream.local_address(Tcp(client_socket, "127.0.0.1", port))
+  should.equal(ip, "127.0.0.1")
+  should.be_true(local_port > 0)
+
+  close_listen(listen_socket)
+  let _ = stream.shutdown(Tcp(client_socket, "127.0.0.1", port))
+  Nil
+}

@@ -1,6 +1,6 @@
 -module(test_container_ffi).
--export([start_ftp_container/0, start_ftps_container/0,
-         get_ftp_port/1, get_ftps_port/1, get_mapped_port/2, stop_container/1]).
+-export([start_ftp_container/0, start_ftp_active_container/0, start_ftps_container/0,
+         get_ftp_port/1, get_ftp_active_port/1, get_ftps_port/1, get_mapped_port/2, stop_container/1]).
 
 -define(IMAGE, "delfer/alpine-ftp-server:latest").
 
@@ -22,6 +22,27 @@ start_ftp_container() ->
 
 get_ftp_port(_ContainerId) ->
     2121.
+
+%% Start an FTP container with --network host for active mode testing.
+%% With host networking, the container shares the host's network namespace,
+%% so the FTP server can connect back to the client's listening port on 127.0.0.1.
+%% This only works on Linux (CI uses ubuntu-latest).
+start_ftp_active_container() ->
+    cmd("docker ps -aq --filter ancestor=" ?IMAGE
+        " | xargs docker rm -f 2>/dev/null; true", 10000),
+    Cmd = "docker run -d"
+        " --network host"
+        " -e \"USERS=test|test|/home/test\""
+        " -e ADDRESS=127.0.0.1"
+        " -e MIN_PORT=21100"
+        " -e MAX_PORT=21110"
+        " " ?IMAGE,
+    ContainerId = string:trim(cmd(Cmd, 60000)),
+    wait_for_ready(ContainerId, 30),
+    list_to_binary(ContainerId).
+
+get_ftp_active_port(_ContainerId) ->
+    21.
 
 start_ftps_container() ->
     %% Clean up any stale containers from previous failed runs
