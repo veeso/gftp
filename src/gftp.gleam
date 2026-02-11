@@ -548,7 +548,7 @@ pub fn appe(
 }
 
 /// Execute `LIST` command which returns the detailed file listing in human readable format.
-/// If `pathname` is omited then the list of files in the current directory will be
+/// If `pathname` is omitted then the list of files in the current directory will be
 /// returned otherwise it will the list of files on `pathname`.
 ///
 /// ### Parse result
@@ -561,7 +561,7 @@ pub fn appe(
 /// import gftp
 /// import gftp/list as gftp_list
 /// import gleam/list
-/// 
+///
 /// use lines <- result.try(gftp.list(ftp_client, None))
 /// lines
 /// |> list.try_map(gftp_list.parse_list)
@@ -574,11 +574,11 @@ pub fn list(
 }
 
 /// Execute `NLST` command which returns the list of file names only.
-/// If `pathname` is omited then the list of files in the current directory will be
+/// If `pathname` is omitted then the list of files in the current directory will be
 /// returned otherwise it will the list of files on `pathname`.
-/// 
+///
 /// ### Parse result
-/// 
+///
 /// The output of the `NLST` command is just a list of file names, so it doesn't require any special parsing like the `LIST` command.
 pub fn nlst(
   ftp_client: FtpClient,
@@ -588,21 +588,22 @@ pub fn nlst(
 }
 
 /// Execute `MLSD` command which returns the machine-processable listing of a directory.
-/// If `pathname` is omited then the list of files in the current directory will be
-/// 
+/// If `pathname` is omitted then the list of files in the current directory will be
+/// returned otherwise it will the list of files on `pathname`.
+///
 /// ### Parse result
-/// 
+///
 /// The output of the `MLSD` command is a machine-readable format that provides detailed information about each file in the listing,
 /// such as name, size, permissions, and modification date, in a standardized format defined by RFC 3659.
-/// 
-/// You can parse the output of this command with `gftp/list` module, which provides a `File` type and the `parse_mlsd` 
+///
+/// You can parse the output of this command with `gftp/list` module, which provides a `File` type and the `parse_mlsd`
 /// function to parse the output of the `MLSD` command into a list of `File` structs.
-/// 
+///
 /// ```gleam
 /// import gftp
 /// import gftp/list as gftp_list
 /// import gleam/list
-/// 
+///
 /// use lines <- result.try(gftp.mlsd(ftp_client, None))
 /// lines
 /// |> list.try_map(gftp_list.parse_mlsd)
@@ -621,8 +622,8 @@ pub fn mlsd(
 /// The output of the `MLST` command is a machine-readable format that provides detailed information about a file,
 /// such as name, size, permissions, and modification date, in a standardized format defined by RFC 3659.
 /// 
-/// You can parse the output of this command with `gftp/list` module, which provides a `File` type and the `parse_mlst` 
-/// function to parse the output of the `MLSD` command into a list of `File` structs.
+/// You can parse the output of this command with `gftp/list` module, which provides a `File` type and the `parse_mlst`
+/// function to parse the output of the `MLST` command into a `File` struct.
 /// 
 /// ```gleam
 /// import gftp
@@ -704,7 +705,7 @@ pub fn size(ftp_client: FtpClient, pathname: String) -> FtpResult(Int) {
 /// Retrieves the features supported by the server, through the FEAT command.
 pub fn feat(ftp_client: FtpClient) -> FtpResult(Features) {
   use _ <- result.try(perform(ftp_client, command.Feat))
-  use response <- result.try(read_response(ftp_client, status.CommandOk))
+  use response <- result.try(read_response(ftp_client, status.System))
   use body <- result.try(utils.response_to_string(response))
 
   let lines = string.split(body, "\n")
@@ -852,7 +853,12 @@ fn read_response_in(
     body
     |> string.join("\n")
     |> bit_array.from_string
-  Ok(Response(status, body))
+  let response = Response(status, body)
+
+  case list.contains(expected_statuses, status) {
+    True -> Ok(response)
+    False -> Error(ftp_result.UnexpectedResponse(response))
+  }
 }
 
 /// Read a line from the control connection stream and return it as a string along with bytes read.

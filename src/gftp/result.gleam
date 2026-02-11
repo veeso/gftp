@@ -11,8 +11,6 @@ pub type FtpResult(a) =
 pub type FtpError {
   /// Connection error
   ConnectionError(mug.ConnectError)
-  /// There was an error with the secure stream
-  SecureError(String)
   /// Unexpected response from remote. The command expected a certain response, but got another one.
   /// This means the ftp server refused to perform your request or there was an error while processing it.
   /// Contains the response data.
@@ -23,8 +21,6 @@ pub type FtpError {
   Tls(kafein.Error)
   /// The address provided was invalid
   Socket(mug.Error)
-  /// Data connection is already open. You can't open more than one data connection at a time.
-  DataConnectionAlreadyOpen
 }
 
 fn connection_error_to_string(e: mug.ConnectError) -> String {
@@ -39,11 +35,9 @@ fn connection_error_to_string(e: mug.ConnectError) -> String {
 pub fn describe_error(err: FtpError) -> String {
   case err {
     ConnectionError(e) -> "Connection error: " <> connection_error_to_string(e)
-    SecureError(e) -> "Secure error: " <> e
     UnexpectedResponse(r) -> "Unexpected response: " <> response.describe(r)
     BadResponse -> "Bad response syntax"
     Socket(e) -> "Socket error: " <> mug.describe_error(e)
-    DataConnectionAlreadyOpen -> "Data connection is already open"
     Tls(e) ->
       "TLS error"
       <> case e {

@@ -27,12 +27,6 @@ pub fn describe_error_connection_error_both_test() {
   |> should.equal("Connection error: Connection refused")
 }
 
-pub fn describe_error_secure_error_test() {
-  result.SecureError("TLS handshake failed")
-  |> result.describe_error
-  |> should.equal("Secure error: TLS handshake failed")
-}
-
 pub fn describe_error_unexpected_response_test() {
   result.UnexpectedResponse(
     Response(code: status.NotLoggedIn, message: <<"Login required":utf8>>),
@@ -51,12 +45,6 @@ pub fn describe_error_socket_error_test() {
   result.Socket(mug.Econnreset)
   |> result.describe_error
   |> should.equal("Socket error: Connection reset by peer")
-}
-
-pub fn describe_error_data_connection_already_open_test() {
-  result.DataConnectionAlreadyOpen
-  |> result.describe_error
-  |> should.equal("Data connection is already open")
 }
 
 pub fn describe_error_tls_closed_test() {
