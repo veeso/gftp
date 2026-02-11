@@ -10,6 +10,7 @@ import gleam/option.{None, Some}
 import gleam/result
 import gleam/string
 import gleeunit/should
+import kafein
 
 @external(erlang, "stream_test_ffi", "get_env")
 fn get_env(name: String) -> Result(String, Nil)
@@ -19,6 +20,12 @@ fn start_ftp_container() -> String
 
 @external(erlang, "test_container_ffi", "get_ftp_port")
 fn get_ftp_port(container_id: String) -> Int
+
+@external(erlang, "test_container_ffi", "start_ftps_container")
+fn start_ftps_container() -> String
+
+@external(erlang, "test_container_ffi", "get_ftps_port")
+fn get_ftps_port(container_id: String) -> Int
 
 @external(erlang, "test_container_ffi", "stop_container")
 fn stop_container(container_id: String) -> Nil
@@ -360,6 +367,61 @@ pub fn rest_test() {
         Ok(Nil)
       })
     let assert Ok(_) = gftp.dele(client, "rest_test.txt")
+    Nil
+  })
+}
+
+// --- FTPS tests ---
+
+/// Run an integration test with a real FTPS connection.
+/// Starts a Docker FTP container with TLS enabled, connects,
+/// upgrades to TLS via AUTH TLS, logs in, runs the callback, then cleans up.
+/// Skipped unless GFTP_INTEGRATION_TESTS env var is set.
+fn with_ftps_connection(callback: fn(FtpClient) -> Nil) -> Nil {
+  case require_integration() {
+    False -> Nil
+    True -> {
+      let container_id = start_ftps_container()
+      let port = get_ftps_port(container_id)
+      let assert Ok(client) =
+        gftp.connect_timeout("127.0.0.1", port, timeout: 30_000)
+      let ssl_options =
+        kafein.default_options
+        |> kafein.verify(verify_type: kafein.VerifyNone)
+      let assert Ok(client) = gftp.into_secure(client, ssl_options)
+      let assert Ok(_) = gftp.login(client, "test", "test")
+      callback(client)
+      let assert Ok(_) = gftp.quit(client)
+      stop_container(container_id)
+    }
+  }
+}
+
+pub fn ftps_connect_and_login_test() {
+  with_ftps_connection(fn(client) {
+    let assert Ok(pwd) = gftp.pwd(client)
+    pwd |> should.equal("/home/test")
+    Nil
+  })
+}
+
+pub fn ftps_stor_and_retr_test() {
+  with_ftps_connection(fn(client) {
+    let assert Ok(_) = gftp.transfer_type(client, file_type.Binary)
+    let content = "Hello, FTPS!"
+    let assert Ok(_) =
+      gftp.stor(client, "ftps_test.txt", fn(data_stream) {
+        stream.send(data_stream, bit_array.from_string(content))
+        |> result.map_error(ftp_result.Socket)
+      })
+    let assert Ok(_) =
+      gftp.retr(client, "ftps_test.txt", fn(data_stream) {
+        let assert Ok(data) = stream.receive(data_stream, 5000)
+        let assert Ok(text) = bit_array.to_string(data)
+        text |> should.equal(content)
+        Ok(Nil)
+      })
+    let assert Ok(_) = gftp.dele(client, "ftps_test.txt")
     Nil
   })
 }
