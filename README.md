@@ -21,9 +21,39 @@ gleam add gftp@1
 
 ```gleam
 import gftp
+import gftp/command/file_type
+import gftp/stream
+import gftp/result as ftp_result
+import gleam/bit_array
+import gleam/option.{None}
+import gleam/result
 
-pub fn main() -> Nil {
-  // TODO: An example of the project in use
+pub fn main() {
+  // Connect and login
+  let assert Ok(client) = gftp.connect("ftp.example.com", 21)
+  let assert Ok(_) = gftp.login(client, "user", "password")
+
+  // Set binary transfer type
+  let assert Ok(_) = gftp.transfer_type(client, file_type.Binary)
+
+  // Upload a file
+  let assert Ok(_) = gftp.stor(client, "hello.txt", fn(data_stream) {
+    stream.send(data_stream, bit_array.from_string("Hello, world!"))
+    |> result.map_error(ftp_result.Socket)
+  })
+
+  // List current directory
+  let assert Ok(entries) = gftp.list(client, None)
+
+  // Download a file
+  let assert Ok(_) = gftp.retr(client, "hello.txt", fn(data_stream) {
+    let assert Ok(_data) = stream.receive(data_stream, 5000)
+    Ok(Nil)
+  })
+
+  // Quit and shutdown
+  let assert Ok(_) = gftp.quit(client)
+  let assert Ok(_) = gftp.shutdown(client)
 }
 ```
 
