@@ -1,7 +1,7 @@
 name = "gftp"
 version = "1.0.0"
 licenses = ["MIT"]
-description = "A ✨ Gleam FTP/FTPS client library with full RFC support for both passive and active mode"
+description = "A Gleam FTP/FTPS client library with full RFC support for both passive and active mode"
 target = "erlang"
 repository = { type = "github", user = "veeso", repo = "gftp" }
 links = [{ title = "Codeberg", href = "https://codeberg.org/veeso/gftp" }]

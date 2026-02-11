@@ -915,7 +915,7 @@ pub fn opts(
 /// ```
 pub fn site(ftp_client: FtpClient, sub_command: String) -> FtpResult(Response) {
   use _ <- result.try(perform(ftp_client, command.Site(sub_command)))
-  read_response(ftp_client, status.CommandOk)
+  read_response_in(ftp_client, [status.CommandOk, status.Help])
 }
 
 /// Execute a custom FTP command and return the response.
@@ -925,7 +925,7 @@ pub fn site(ftp_client: FtpClient, sub_command: String) -> FtpResult(Response) {
 /// ```gleam
 /// import gftp/status
 ///
-/// let assert Ok(response) = gftp.custom_command(client, "SITE HELP", [status.CommandOk])
+/// let assert Ok(response) = gftp.custom_command(client, "SITE HELP", [status.Help])
 /// ```
 pub fn custom_command(
   ftp_client: FtpClient,
