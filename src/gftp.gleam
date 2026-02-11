@@ -769,6 +769,7 @@ pub fn read_lines_from_stream(
   data_stream: DataStream,
   timeout: Int,
 ) -> FtpResult(List(String)) {
+  stream.set_line_mode(data_stream)
   read_lines_from_stream_loop([], data_stream, timeout)
 }
 
@@ -779,6 +780,7 @@ pub fn read_lines_from_stream(
 /// Read the server's welcome message (status 220 Ready) and return
 /// an updated FtpClient with the welcome_message field populated.
 fn read_welcome_message(client: FtpClient) -> FtpResult(FtpClient) {
+  stream.set_line_mode(client.data_stream)
   case read_response(client, status.Ready) {
     Ok(resp) -> {
       let welcome_msg = case response.to_string(resp) {
@@ -842,24 +844,33 @@ fn read_line(ftp_client: FtpClient) -> FtpResult(String) {
   read_line_with(ftp_client.data_stream, ftp_client.data_timeout)
 }
 
-/// Read a line from the provided data stream with the specified timeout and return it as a string along with bytes read.
-fn read_line_with(stream: DataStream, timeout: Int) -> FtpResult(String) {
-  use bytes <- result.try(read_line_loop([], stream, timeout))
-  bytes
-  |> bit_array.to_string
-  |> result.map_error(fn(_) { ftp_result.BadResponse })
+/// Read a line from the provided data stream with the specified timeout and return it as a string.
+/// Expects the stream to be in {packet, line} mode, where recv returns one complete line per call.
+fn read_line_with(data_stream: DataStream, timeout: Int) -> FtpResult(String) {
+  case stream.receive(data_stream, timeout) {
+    Ok(bytes) -> {
+      let bytes = strip_trailing_lf(bytes)
+      bytes
+      |> bit_array.to_string
+      |> result.map_error(fn(_) { ftp_result.BadResponse })
+    }
+    Error(e) -> Error(ftp_result.Socket(e))
+  }
 }
 
-/// Recursive loop for `read_line`
-fn read_line_loop(
-  acc: List(BitArray),
-  data_stream: DataStream,
-  timeout: Int,
-) -> FtpResult(BitArray) {
-  case stream.receive_exact(data_stream, 1, timeout) {
-    Ok(<<0x0A>>) -> acc |> list.reverse |> bit_array.concat |> Ok
-    Ok(byte) -> read_line_loop([byte, ..acc], data_stream, timeout)
-    Error(e) -> Error(ftp_result.Socket(e))
+/// Strip a trailing 0x0A (LF) byte if present, since {packet, line} includes it.
+fn strip_trailing_lf(bytes: BitArray) -> BitArray {
+  let size = bit_array.byte_size(bytes)
+  case size > 0 {
+    True ->
+      case bit_array.slice(bytes, size - 1, 1) {
+        Ok(<<0x0A>>) -> {
+          let assert Ok(trimmed) = bit_array.slice(bytes, 0, size - 1)
+          trimmed
+        }
+        _ -> bytes
+      }
+    False -> bytes
   }
 }
 
