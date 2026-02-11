@@ -1,23 +1,15 @@
-//// GFTP - A ✨ Gleam FTP/FTPS client library with full RFC support for both passive and active mode
-//// 
-//// Gleam FTP (gftp) is Gleam Client library for FTP (File Transfer Protocol) and FTPS (FTP over SSL/TLS) with full
-//// RFC 959, RFC 2228, RFC 4217, RFC 2428 and RFC 2389 compliance.
-//// 
-//// ## Naming of functions
-//// 
-//// The `FtpClient` function names follow the FTP command names as much as possible,
-//// so if you are familiar with FTP commands, you will find it easy to use gftp.
-//// Otherwise I can understand that `dele` instead of `delete` can be a bit confusing,
-//// but I wanted to keep the command names as close as possible to the actual FTP commands for better 
-//// readability and easier mapping to the FTP protocol.
-//// 
+//// GFTP - A Gleam FTP/FTPS client library with full RFC support for both passive and active mode
+////
+//// Gleam FTP (gftp) is a Gleam client library for FTP (File Transfer Protocol) and FTPS (FTP over SSL/TLS) with full
+//// RFC 959, RFC 2228, RFC 4217, RFC 2428 and RFC 2389 compliance. It runs on the Erlang VM.
+////
 //// ## Add gftp to your project
-//// 
+////
 //// ```bash
 //// gleam add gftp@1
 //// ```
-//// 
-//// ## Usage
+////
+//// ## Quick start
 ////
 //// ```gleam
 //// import gftp
@@ -43,7 +35,7 @@
 ////   })
 ////
 ////   // List current directory
-////   let assert Ok(entries) = gftp.list(client, None)
+////   let assert Ok(_entries) = gftp.list(client, None)
 ////
 ////   // Download a file
 ////   let assert Ok(_) = gftp.retr(client, "hello.txt", fn(data_stream) {
@@ -56,7 +48,69 @@
 ////   let assert Ok(_) = gftp.shutdown(client)
 //// }
 //// ```
-//// 
+////
+//// ## FTPS (Secure FTP)
+////
+//// To use explicit FTPS, connect normally and then upgrade the connection:
+////
+//// ```gleam
+//// let assert Ok(client) = gftp.connect("ftp.example.com", 21)
+//// let assert Ok(client) = gftp.into_secure(client, ssl_options)
+//// let assert Ok(_) = gftp.login(client, "user", "password")
+//// ```
+////
+//// ## Data transfer modes
+////
+//// gftp defaults to passive mode. You can switch to active or extended passive mode:
+////
+//// ```gleam
+//// import gftp/mode
+////
+//// // Extended passive mode (RFC 2428, supports IPv6)
+//// let client = gftp.with_mode(client, mode.ExtendedPassive)
+////
+//// // Active mode with 30s timeout
+//// let client = gftp.with_active_mode(client, 30_000)
+////
+//// // Enable NAT workaround for passive mode behind firewalls
+//// let client = gftp.with_nat_workaround(client, True)
+//// ```
+////
+//// ## Directory listings
+////
+//// Parse structured file metadata from LIST or MLSD output:
+////
+//// ```gleam
+//// import gftp/list as gftp_list
+//// import gftp/list/file
+//// import gleam/list
+////
+//// let assert Ok(lines) = gftp.list(client, None)
+//// let assert Ok(files) = list.try_map(lines, gftp_list.parse_list)
+//// let name = file.name(files |> list.first |> result.unwrap(file.empty()))
+//// ```
+////
+//// ## Error handling
+////
+//// All operations return `FtpResult(a)` which is `Result(a, FtpError)`.
+//// Use `gftp/result.describe_error` for human-readable messages:
+////
+//// ```gleam
+//// import gftp/result
+////
+//// case gftp.cwd(client, "/nonexistent") {
+////   Ok(_) -> // success
+////   Error(err) -> {
+////     let msg = result.describe_error(err)
+////   }
+//// }
+//// ```
+////
+//// ## Naming convention
+////
+//// Function names follow FTP command names (`cwd`, `pwd`, `mkd`, `rmd`, `dele`, `retr`, `stor`, etc.)
+//// for direct mapping to the FTP protocol.
+////
 
 import gftp/command.{type Command}
 import gftp/command/feat.{type Features}
@@ -126,35 +180,28 @@ pub opaque type FtpClient {
   )
 }
 
-/// Try to connect to the remote server
-/// 
-/// The default timeout of 30 seconds is used for the connection attempt.
-/// 
-/// This method connects to the FTP server at the specified
-/// `host` and `port`, reads the server's welcome message, and initializes the `FtpClient` instance with the appropriate settings.
-/// 
-/// This method doesn't authenticate with the server, so after a successful connection, you will need to call the `login`
-/// method to authenticate before performing any FTP operations.
-/// 
-/// On success, returns a `FtpClient` instance that can be used to interact with the FTP server.
-/// On failure, returns an `FtpError` describing the issue.
+/// Try to connect to the remote server with the default timeout of 30 seconds.
+///
+/// Connects to the FTP server at the specified `host` and `port`, reads the server's welcome message,
+/// and returns an `FtpClient` instance. You must call `login` before performing any FTP operations.
+///
+/// ```gleam
+/// let assert Ok(client) = gftp.connect("ftp.example.com", 21)
+/// let assert Ok(_) = gftp.login(client, "user", "password")
+/// ```
 pub fn connect(host: String, port: Int) -> FtpResult(FtpClient) {
   // Default timeout of 30 seconds
   connect_timeout(host, port, timeout: default_timeout)
 }
 
-/// Try to connect to the remote server
-/// 
+/// Try to connect to the remote server with a custom timeout.
+///
 /// The `timeout` parameter specifies the maximum time to wait for a connection to be established, in milliseconds.
-/// 
-///  This method connects to the FTP server at the specified
-/// `host` and `port`, reads the server's welcome message, and initializes the `FtpClient` instance with the appropriate settings.
-/// 
-/// This method doesn't authenticate with the server, so after a successful connection, you will need to call the `login`
-/// method to authenticate before performing any FTP operations.
-/// 
-/// On success, returns a `FtpClient` instance that can be used to interact with the FTP server.
-/// On failure, returns an `FtpError` describing the issue.
+/// You must call `login` before performing any FTP operations.
+///
+/// ```gleam
+/// let assert Ok(client) = gftp.connect_timeout("ftp.example.com", 21, timeout: 10_000)
+/// ```
 pub fn connect_timeout(
   host: String,
   port port: Int,
@@ -198,7 +245,13 @@ pub fn welcome_message(ftp_client: FtpClient) -> Option(String) {
   ftp_client.welcome_message
 }
 
-/// Enable active mode for the FTP client with the specified timeout for the data connection.
+/// Enable active mode for the FTP client with the specified timeout (in milliseconds) for the data connection.
+///
+/// In active mode, the client opens a local port and the server connects back to it for data transfer.
+///
+/// ```gleam
+/// let client = gftp.with_active_mode(client, 30_000)
+/// ```
 pub fn with_active_mode(ftp_client: FtpClient, timeout: Int) -> FtpClient {
   FtpClient(..ftp_client, mode: mode.Active(timeout))
 }
@@ -212,12 +265,26 @@ pub fn with_passive_stream_builder(
   FtpClient(..ftp_client, passive_stream_builder: builder)
 }
 
-/// Set data mode
+/// Set the data transfer mode (Passive, ExtendedPassive, or Active).
+///
+/// ```gleam
+/// import gftp/mode
+///
+/// let client = gftp.with_mode(client, mode.ExtendedPassive)
+/// ```
 pub fn with_mode(ftp_client: FtpClient, mode: Mode) -> FtpClient {
   FtpClient(..ftp_client, mode: mode)
 }
 
-/// Set NAT workaround for passive mode
+/// Enable or disable the NAT workaround for passive mode.
+///
+/// When enabled, the client uses the control connection's peer address instead of the address
+/// returned by the PASV command for data connections. This is useful when the server is behind
+/// a NAT and reports its internal IP address.
+///
+/// ```gleam
+/// let client = gftp.with_nat_workaround(client, True)
+/// ```
 pub fn with_nat_workaround(
   ftp_client: FtpClient,
   nat_workaround: Bool,
@@ -225,8 +292,16 @@ pub fn with_nat_workaround(
   FtpClient(..ftp_client, nat_workaround: nat_workaround)
 }
 
-/// Switch to explicit secure mode if possible (FTPS), using a provided SSL configuration.
-/// This method does nothing if the connect is already secured.
+/// Switch to explicit secure mode (FTPS) using the provided SSL configuration.
+///
+/// Sends AUTH TLS, upgrades the connection to SSL/TLS, sets PBSZ to 0 and PROT to Private.
+/// This method does nothing if the connection is already secured.
+///
+/// ```gleam
+/// let assert Ok(client) = gftp.connect("ftp.example.com", 21)
+/// let assert Ok(client) = gftp.into_secure(client, ssl_options)
+/// let assert Ok(_) = gftp.login(client, "user", "password")
+/// ```
 pub fn into_secure(
   ftp_client: FtpClient,
   ssl_options: kafein.WrapOptions,
@@ -255,11 +330,14 @@ pub fn into_secure(
   Ok(ftp_client)
 }
 
-/// Connect to remote ftps server using IMPLICIT secure connection.
-/// 
-/// Warning: mind that implicit ftps should be considered deprecated, if you can use explicit mode with [`into_secure`]
-/// Most of modern servers don't support implicit ftps anymore, but if you need to connect to one of those legacy servers,
-/// this function can be useful.
+/// Connect to a remote FTPS server using an implicit secure connection (typically port 990).
+///
+/// Warning: implicit FTPS is considered deprecated. Prefer explicit mode with `into_secure` when possible.
+///
+/// ```gleam
+/// let assert Ok(client) = gftp.connect_secure_implicit("ftp.example.com", 990, ssl_options, 30_000)
+/// let assert Ok(_) = gftp.login(client, "user", "password")
+/// ```
 pub fn connect_secure_implicit(
   host: String,
   port: Int,
@@ -300,7 +378,12 @@ pub fn get_stream(ftp_client: FtpClient) -> DataStream {
 }
 
 /// Log in to the FTP server with the provided username and password.
-/// This is required before performing any FTP operations after connecting to the server.
+/// This is required before performing any FTP operations after connecting.
+///
+/// ```gleam
+/// let assert Ok(client) = gftp.connect("ftp.example.com", 21)
+/// let assert Ok(_) = gftp.login(client, "user", "password")
+/// ```
 pub fn login(
   ftp_client: FtpClient,
   username: String,
@@ -339,6 +422,10 @@ pub fn clear_command_channel(ftp_client: FtpClient) -> FtpResult(FtpClient) {
 }
 
 /// Change the current working directory on the FTP server to the specified path.
+///
+/// ```gleam
+/// let assert Ok(_) = gftp.cwd(client, "/pub/data")
+/// ```
 pub fn cwd(ftp_client: FtpClient, path: String) -> FtpResult(Nil) {
   use _ <- result.try(perform(ftp_client, command.Cwd(path)))
   use _ <- result.try(read_response(ftp_client, status.RequestedFileActionOk))
@@ -360,6 +447,10 @@ pub fn cdup(ftp_client: FtpClient) -> FtpResult(Nil) {
 }
 
 /// Get the current working directory on the FTP server.
+///
+/// ```gleam
+/// let assert Ok(cwd) = gftp.pwd(client)
+/// ```
 pub fn pwd(ftp_client: FtpClient) -> FtpResult(String) {
   use _ <- result.try(perform(ftp_client, command.Pwd))
   use response <- result.try(read_response(ftp_client, status.PathCreated))
@@ -395,7 +486,11 @@ pub fn eprt(
   Ok(Nil)
 }
 
-/// This creates a new directory on the server at the specified path.
+/// Create a new directory on the server at the specified path.
+///
+/// ```gleam
+/// let assert Ok(_) = gftp.mkd(client, "new_folder")
+/// ```
 pub fn mkd(ftp_client: FtpClient, path: String) -> FtpResult(Nil) {
   use _ <- result.try(perform(ftp_client, command.Mkd(path)))
   use _ <- result.try(read_response(ftp_client, status.PathCreated))
@@ -403,8 +498,16 @@ pub fn mkd(ftp_client: FtpClient, path: String) -> FtpResult(Nil) {
   Ok(Nil)
 }
 
-/// Sets the type of file to be transferred. That is the implementation of the `TYPE` command,
-/// which is used to specify the type of file being transferred (e.g., ASCII, binary).
+/// Set the type of file to be transferred (FTP `TYPE` command).
+///
+/// Use `file_type.Binary` (or `file_type.Image`) for binary transfers,
+/// `file_type.Ascii(file_type.Default)` for text transfers.
+///
+/// ```gleam
+/// import gftp/command/file_type
+///
+/// let assert Ok(_) = gftp.transfer_type(client, file_type.Binary)
+/// ```
 pub fn transfer_type(
   ftp_client: FtpClient,
   file_type: file_type.FileType,
@@ -415,10 +518,15 @@ pub fn transfer_type(
   Ok(Nil)
 }
 
-/// Quits the current FTP session.
-/// 
-/// This doesn't shutdown the data stream immediately, but it sends the `QUIT` command to the server and waits for the
-/// server to respond with a closing connection status before returning.
+/// Quit the current FTP session.
+///
+/// Sends the `QUIT` command and waits for the server to confirm.
+/// Call `shutdown` after this to close the underlying socket.
+///
+/// ```gleam
+/// let assert Ok(_) = gftp.quit(client)
+/// let assert Ok(_) = gftp.shutdown(client)
+/// ```
 pub fn quit(ftp_client: FtpClient) -> FtpResult(Nil) {
   use _ <- result.try(perform(ftp_client, command.Quit))
   use _ <- result.try(read_response(ftp_client, status.Closing))
@@ -426,15 +534,20 @@ pub fn quit(ftp_client: FtpClient) -> FtpResult(Nil) {
   Ok(Nil)
 }
 
-/// Shutdown the data stream of the FTP client. This is used to close the connection to the FTP server.
+/// Close the underlying socket connection to the FTP server.
+///
+/// You should call `quit` before this to gracefully end the FTP session.
 pub fn shutdown(ftp_client: FtpClient) -> FtpResult(Nil) {
   ftp_client.data_stream
   |> stream.shutdown()
   |> result.map_error(ftp_result.Socket)
 }
 
-/// Renames the file from_name to to_name on the FTP server.
-/// This is a two-step process where you first specify the file to rename with `RenameFrom` and then specify the new name with `RenameTo`.
+/// Rename a file on the FTP server.
+///
+/// ```gleam
+/// let assert Ok(_) = gftp.rename(client, "old_name.txt", "new_name.txt")
+/// ```
 pub fn rename(
   ftp_client: FtpClient,
   from_name: String,
@@ -448,7 +561,11 @@ pub fn rename(
   Ok(Nil)
 }
 
-/// Removes the remote directory specified by the path from the server.
+/// Remove the remote directory at the specified path.
+///
+/// ```gleam
+/// let assert Ok(_) = gftp.rmd(client, "old_folder")
+/// ```
 pub fn rmd(ftp_client: FtpClient, path: String) -> FtpResult(Nil) {
   use _ <- result.try(perform(ftp_client, command.Rmd(path)))
   use _ <- result.try(read_response(ftp_client, status.RequestedFileActionOk))
@@ -456,7 +573,11 @@ pub fn rmd(ftp_client: FtpClient, path: String) -> FtpResult(Nil) {
   Ok(Nil)
 }
 
-/// Deletes the file specified by the path from the server.
+/// Delete the file at the specified path on the server.
+///
+/// ```gleam
+/// let assert Ok(_) = gftp.dele(client, "unwanted_file.txt")
+/// ```
 pub fn dele(ftp_client: FtpClient, path: String) -> FtpResult(Nil) {
   use _ <- result.try(perform(ftp_client, command.Dele(path)))
   use _ <- result.try(read_response(ftp_client, status.RequestedFileActionOk))
@@ -494,7 +615,18 @@ pub fn abor(ftp_client: FtpClient) -> FtpResult(Nil) {
   |> result.replace(Nil)
 }
 
-/// Retrieves a file from the FTP server at the specified path and processes it with the provided reader function.
+/// Download a file from the FTP server.
+///
+/// The `reader` callback receives the data stream and should read data from it.
+/// The data stream is automatically closed after the reader returns.
+///
+/// ```gleam
+/// let assert Ok(_) = gftp.retr(client, "file.txt", fn(data_stream) {
+///   let assert Ok(data) = stream.receive(data_stream, 5000)
+///   // process data...
+///   Ok(Nil)
+/// })
+/// ```
 pub fn retr(
   ftp_client: FtpClient,
   path: String,
@@ -510,10 +642,17 @@ pub fn retr(
   finalize_data_command(ftp_client, data_stream)
 }
 
-/// Stores a file on the FTP server at the specified path by sending the file data through the provided writer function.
-/// 
-/// This is used to upload a file to the FTP server.
-/// The `writer` function is called with a `DataStream` that can be used to write the file data to the server in response to the STOR command.
+/// Upload a file to the FTP server.
+///
+/// The `writer` callback receives the data stream and should write the file data to it.
+/// The data stream is automatically closed after the writer returns.
+///
+/// ```gleam
+/// let assert Ok(_) = gftp.stor(client, "upload.txt", fn(data_stream) {
+///   stream.send(data_stream, bit_array.from_string("file contents"))
+///   |> result.map_error(ftp_result.Socket)
+/// })
+/// ```
 pub fn stor(
   ftp_client: FtpClient,
   path: String,
@@ -529,9 +668,14 @@ pub fn stor(
   finalize_data_command(ftp_client, data_stream)
 }
 
-/// Appends a file on the FTP server at the specified path by sending the file data through the provided writer function.
-/// 
-/// This is used to append data to an existing file on the FTP server. If the file doesn't exist, it will be created.
+/// Append data to a file on the FTP server. If the file doesn't exist, it will be created.
+///
+/// ```gleam
+/// let assert Ok(_) = gftp.appe(client, "log.txt", fn(data_stream) {
+///   stream.send(data_stream, bit_array.from_string("new log entry\n"))
+///   |> result.map_error(ftp_result.Socket)
+/// })
+/// ```
 pub fn appe(
   ftp_client: FtpClient,
   path: String,
@@ -651,7 +795,11 @@ pub fn mlst(
   |> result.map_error(fn(_) { ftp_result.BadResponse })
 }
 
-/// Retrieves the modification time of the file at `pathname` if it exists.
+/// Retrieve the modification time of the file at `pathname`.
+///
+/// ```gleam
+/// let assert Ok(mtime) = gftp.mdtm(client, "file.txt")
+/// ```
 pub fn mdtm(ftp_client: FtpClient, pathname: String) -> FtpResult(Timestamp) {
   let assert Ok(regex) = regexp.from_string(mdtm_regex)
   use _ <- result.try(perform(ftp_client, command.Mdtm(pathname)))
@@ -689,7 +837,11 @@ pub fn mdtm(ftp_client: FtpClient, pathname: String) -> FtpResult(Timestamp) {
   }
 }
 
-/// Retrieves the size of the file at `pathname` if it exists.
+/// Retrieve the size in bytes of the file at `pathname`.
+///
+/// ```gleam
+/// let assert Ok(size) = gftp.size(client, "file.txt")
+/// ```
 pub fn size(ftp_client: FtpClient, pathname: String) -> FtpResult(Int) {
   let assert Ok(regex) = regexp.from_string(size_regex)
   use _ <- result.try(perform(ftp_client, command.Size(pathname)))
@@ -702,7 +854,16 @@ pub fn size(ftp_client: FtpClient, pathname: String) -> FtpResult(Int) {
   }
 }
 
-/// Retrieves the features supported by the server, through the FEAT command.
+/// Retrieve the features supported by the server (RFC 2389 FEAT command).
+///
+/// Returns a dictionary of feature names to optional parameter strings.
+///
+/// ```gleam
+/// import gleam/dict
+///
+/// let assert Ok(features) = gftp.feat(client)
+/// let supports_mlst = dict.has_key(features, "MLST")
+/// ```
 pub fn feat(ftp_client: FtpClient) -> FtpResult(Features) {
   use _ <- result.try(perform(ftp_client, command.Feat))
   use response <- result.try(read_response(ftp_client, status.System))
@@ -729,7 +890,13 @@ pub fn feat(ftp_client: FtpClient) -> FtpResult(Features) {
   }
 }
 
-/// Set option `option` with an optional value by performing the OPTS command.
+/// Set a server option (RFC 2389 OPTS command).
+///
+/// ```gleam
+/// import gleam/option.{Some}
+///
+/// let assert Ok(_) = gftp.opts(client, "UTF8", Some("ON"))
+/// ```
 pub fn opts(
   ftp_client: FtpClient,
   option: String,
@@ -741,15 +908,25 @@ pub fn opts(
   Ok(Nil)
 }
 
-/// Execute a command on the server and return the response
+/// Execute a SITE command on the server and return the response.
+///
+/// ```gleam
+/// let assert Ok(response) = gftp.site(client, "CHMOD 755 file.txt")
+/// ```
 pub fn site(ftp_client: FtpClient, sub_command: String) -> FtpResult(Response) {
   use _ <- result.try(perform(ftp_client, command.Site(sub_command)))
   read_response(ftp_client, status.CommandOk)
 }
 
-/// Perform custom command on the server and return the response
-/// 
-/// Provide a list of expected status codes to check the response against.
+/// Execute a custom FTP command and return the response.
+///
+/// Provide a list of expected status codes to validate the response against.
+///
+/// ```gleam
+/// import gftp/status
+///
+/// let assert Ok(response) = gftp.custom_command(client, "SITE HELP", [status.CommandOk])
+/// ```
 pub fn custom_command(
   ftp_client: FtpClient,
   command_str: String,
@@ -759,11 +936,24 @@ pub fn custom_command(
   read_response_in(ftp_client, expected_statuses)
 }
 
-/// Perform a custom command using the data connection.
-/// It allows you to execute a custom command that involves a data connection,
-/// by providing a function that will be called with the data stream and the response from the server after the command is executed.
+/// Execute a custom FTP command that uses a data connection.
 ///
-/// If you want you can easily parse lines from the [`DataStream`] using [`read_lines_from_stream`].
+/// The `on_data_stream` callback receives the data stream and the server response.
+/// Use `read_lines_from_stream` to easily parse line-based output.
+///
+/// ```gleam
+/// import gftp/status
+///
+/// let assert Ok(_) = gftp.custom_data_command(
+///   client,
+///   "LIST -la",
+///   [status.AboutToSend, status.AlreadyOpen],
+///   fn(data_stream, _response) {
+///     let assert Ok(lines) = gftp.read_lines_from_stream(data_stream, 5000)
+///     Ok(Nil)
+///   },
+/// )
+/// ```
 pub fn custom_data_command(
   ftp_client: FtpClient,
   command_str: String,

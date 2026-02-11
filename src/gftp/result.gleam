@@ -1,4 +1,19 @@
-//// The result module exposes the Result type and errors related to gftp.
+//// Error types and result aliases for gftp operations.
+////
+//// All gftp functions return `FtpResult(a)` which is `Result(a, FtpError)`.
+////
+//// ```gleam
+//// import gftp
+//// import gftp/result
+////
+//// case gftp.cwd(client, "/nonexistent") {
+////   Ok(_) -> // success
+////   Error(err) -> {
+////     let msg = result.describe_error(err)
+////     // "Unexpected response: [requested action not taken; file unavailable] ..."
+////   }
+//// }
+//// ```
 
 import gftp/response.{type Response}
 import kafein
@@ -31,7 +46,13 @@ fn connection_error_to_string(e: mug.ConnectError) -> String {
   }
 }
 
-/// The description function takes an FtpError and returns a human-readable string describing the error.
+/// Convert an `FtpError` to a human-readable string.
+///
+/// ```gleam
+/// let msg = result.describe_error(err)
+/// // e.g. "Connection error: Connection refused"
+/// // e.g. "Unexpected response: [user not logged in] Login required"
+/// ```
 pub fn describe_error(err: FtpError) -> String {
   case err {
     ConnectionError(e) -> "Connection error: " <> connection_error_to_string(e)
