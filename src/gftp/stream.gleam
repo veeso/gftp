@@ -7,10 +7,22 @@ import mug
 /// Workaround for kafein bug: patches the WrapOptions to convert the
 /// server_name_indication from a binary to a charlist before kafein.wrap
 /// processes it. Remove once kafein fixes this upstream.
-/// 
+///
 /// See <https://github.com/fuzzko/kafein/issues/1>
 @external(erlang, "stream_ffi", "patch_wrap_options")
 fn patch_wrap_options(options: WrapOptions) -> WrapOptions
+
+@external(erlang, "stream_ffi", "set_tcp_packet_line")
+fn set_tcp_packet_line(socket: mug.Socket) -> Nil
+
+@external(erlang, "stream_ffi", "set_tcp_packet_raw")
+fn set_tcp_packet_raw(socket: mug.Socket) -> Nil
+
+@external(erlang, "stream_ffi", "set_ssl_packet_line")
+fn set_ssl_packet_line(socket: kafein.SslSocket) -> Nil
+
+@external(erlang, "stream_ffi", "set_ssl_packet_raw")
+fn set_ssl_packet_raw(socket: kafein.SslSocket) -> Nil
 
 /// Data Stream used for communications. It can be both of type Tcp in case of plain communication or Ssl in case of FTPS
 pub type DataStream {
@@ -87,6 +99,24 @@ pub fn socket_address(stream: DataStream) -> #(String, Int) {
   case stream {
     Ssl(_, _, host, port) -> #(host, port)
     Tcp(_, host, port) -> #(host, port)
+  }
+}
+
+/// Set the socket to line-delimited packet mode ({packet, line}).
+/// In this mode, recv returns one complete line per call.
+pub fn set_line_mode(stream: DataStream) -> Nil {
+  case stream {
+    Ssl(ssl_socket, _, _, _) -> set_ssl_packet_line(ssl_socket)
+    Tcp(tcp_socket, _, _) -> set_tcp_packet_line(tcp_socket)
+  }
+}
+
+/// Set the socket back to raw packet mode ({packet, raw}).
+/// In this mode, recv returns whatever data is available.
+pub fn set_raw_mode(stream: DataStream) -> Nil {
+  case stream {
+    Ssl(ssl_socket, _, _, _) -> set_ssl_packet_raw(ssl_socket)
+    Tcp(tcp_socket, _, _) -> set_tcp_packet_raw(tcp_socket)
   }
 }
 

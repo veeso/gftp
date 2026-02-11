@@ -1,6 +1,8 @@
 -module(stream_ffi).
 
--export([patch_wrap_options/1]).
+-export([patch_wrap_options/1,
+         set_tcp_packet_line/1, set_tcp_packet_raw/1,
+         set_ssl_packet_line/1, set_ssl_packet_raw/1]).
 
 %% Workaround for kafein bug: kafein passes the server_name_indication as a
 %% binary to ssl:connect, but Erlang's ssl module expects a charlist.
@@ -14,3 +16,19 @@ patch_wrap_options(Options) ->
         _ ->
             Options
     end.
+
+set_tcp_packet_line(Socket) ->
+    inet:setopts(Socket, [{packet, line}]),
+    nil.
+
+set_tcp_packet_raw(Socket) ->
+    inet:setopts(Socket, [{packet, raw}]),
+    nil.
+
+set_ssl_packet_line(Socket) ->
+    ssl:setopts(Socket, [{packet, line}]),
+    nil.
+
+set_ssl_packet_raw(Socket) ->
+    ssl:setopts(Socket, [{packet, raw}]),
+    nil.
