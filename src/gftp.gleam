@@ -59,6 +59,7 @@
 //// 
 
 import gftp/command.{type Command}
+import gftp/command/feat.{type Features}
 import gftp/command/file_type
 import gftp/command/protection_level
 import gftp/mode.{type Mode}
@@ -68,6 +69,7 @@ import gftp/status.{type Status}
 import gftp/stream.{type DataStream}
 import gftp/utils
 import gleam/bit_array
+import gleam/dict
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -708,8 +710,30 @@ pub fn size(ftp_client: FtpClient, pathname: String) -> FtpResult(Int) {
 }
 
 /// Retrieves the features supported by the server, through the FEAT command.
-pub fn feat(_ftp_client: FtpClient) -> FtpResult(Nil) {
-  todo as "Implement in another PR, very complicated"
+pub fn feat(ftp_client: FtpClient) -> FtpResult(Features) {
+  use _ <- result.try(perform(ftp_client, command.Feat))
+  use response <- result.try(read_response(ftp_client, status.CommandOk))
+  use body <- result.try(utils.response_to_string(response))
+
+  let lines = string.split(body, "\n")
+  case lines {
+    // Single line response (no features)
+    [single] ->
+      case feat.is_last_line(single) {
+        True -> Ok(dict.new())
+        False -> Error(ftp_result.BadResponse)
+      }
+    // Multiline: drop first (header) and last (closing "211 End") lines
+    [_, ..rest] -> {
+      let feature_lines =
+        rest
+        |> list.reverse
+        |> list.drop(1)
+        |> list.reverse
+      feat.parse_features(feature_lines)
+    }
+    [] -> Ok(dict.new())
+  }
 }
 
 /// Set option `option` with an optional value by performing the OPTS command.

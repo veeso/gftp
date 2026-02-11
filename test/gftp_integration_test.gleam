@@ -5,6 +5,7 @@ import gftp/result as ftp_result
 import gftp/status
 import gftp/stream
 import gleam/bit_array
+import gleam/dict
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
@@ -319,6 +320,24 @@ pub fn nlst_test() {
 // mlsd_test disabled: vsftpd in test container doesn't support MLSD
 
 // mlst_test disabled: vsftpd in test container doesn't support MLST
+
+// --- FEAT command tests ---
+
+pub fn feat_test() {
+  with_ftp_connection(fn(client) {
+    let assert Ok(features) = gftp.feat(client)
+    // vsftpd supports these features
+    dict.has_key(features, "EPRT") |> should.be_true
+    dict.has_key(features, "EPSV") |> should.be_true
+    dict.has_key(features, "MDTM") |> should.be_true
+    dict.has_key(features, "PASV") |> should.be_true
+    dict.has_key(features, "SIZE") |> should.be_true
+    dict.has_key(features, "UTF8") |> should.be_true
+    // REST has a value "STREAM"
+    dict.get(features, "REST") |> should.equal(Ok(Some("STREAM")))
+    Nil
+  })
+}
 
 // --- Misc command tests ---
 
