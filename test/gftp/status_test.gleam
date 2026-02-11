@@ -440,7 +440,7 @@ pub fn description_bad_arguments_test() {
 
 pub fn description_not_implemented_test() {
   status.describe(NotImplemented)
-  |> should.equal("comamnd not implemented")
+  |> should.equal("command not implemented")
 }
 
 pub fn description_bad_sequence_test() {
@@ -475,7 +475,7 @@ pub fn description_page_type_unknown_test() {
 
 pub fn description_exceeded_storage_test() {
   status.describe(ExceededStorage)
-  |> should.equal("requested file action aborted; execeeded storage allocation")
+  |> should.equal("requested file action aborted; exceeded storage allocation")
 }
 
 pub fn description_bad_filename_test() {

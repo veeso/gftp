@@ -18,9 +18,43 @@
 //// ```
 //// 
 //// ## Usage
-//// 
+////
 //// ```gleam
-//// 
+//// import gftp
+//// import gftp/command/file_type
+//// import gftp/stream
+//// import gftp/result as ftp_result
+//// import gleam/bit_array
+//// import gleam/option.{None}
+//// import gleam/result
+////
+//// pub fn main() {
+////   // Connect and login
+////   let assert Ok(client) = gftp.connect("ftp.example.com", 21)
+////   let assert Ok(_) = gftp.login(client, "user", "password")
+////
+////   // Set binary transfer type
+////   let assert Ok(_) = gftp.transfer_type(client, file_type.Binary)
+////
+////   // Upload a file
+////   let assert Ok(_) = gftp.stor(client, "hello.txt", fn(data_stream) {
+////     stream.send(data_stream, bit_array.from_string("Hello, world!"))
+////     |> result.map_error(ftp_result.Socket)
+////   })
+////
+////   // List current directory
+////   let assert Ok(entries) = gftp.list(client, None)
+////
+////   // Download a file
+////   let assert Ok(_) = gftp.retr(client, "hello.txt", fn(data_stream) {
+////     let assert Ok(_data) = stream.receive(data_stream, 5000)
+////     Ok(Nil)
+////   })
+////
+////   // Quit and shutdown
+////   let assert Ok(_) = gftp.quit(client)
+////   let assert Ok(_) = gftp.shutdown(client)
+//// }
 //// ```
 //// 
 
@@ -157,18 +191,7 @@ pub fn connect_with_stream(
       data_timeout: default_timeout,
     )
 
-  // Read the server's welcome message and set the welcome message
-  case read_response(client, status.Ready) {
-    Ok(response) -> {
-      let welcome_msg = case response.to_string(response) {
-        Ok(msg) -> Some(msg)
-        Error(_) -> None
-      }
-
-      Ok(FtpClient(..client, welcome_message: welcome_msg))
-    }
-    Error(err) -> Error(err)
-  }
+  read_welcome_message(client)
 }
 
 /// Get the welcome message from the FTP server, if available.
@@ -254,21 +277,24 @@ pub fn connect_secure_implicit(
   |> result.map_error(ftp_result.ConnectionError)
   |> result.try(fn(socket) {
     case kafein.wrap(ssl_options, socket) {
-      Ok(ssl_socket) ->
-        Ok(FtpClient(
-          data_stream: stream.Ssl(
-            ssl: ssl_socket,
-            tcp: socket,
-            host: host,
-            port: port,
-          ),
-          mode: mode.Passive,
-          nat_workaround: False,
-          welcome_message: None,
-          passive_stream_builder: default_passive_stream_builder,
-          tls_options: Some(ssl_options),
-          data_timeout: default_timeout,
-        ))
+      Ok(ssl_socket) -> {
+        let client =
+          FtpClient(
+            data_stream: stream.Ssl(
+              ssl: ssl_socket,
+              tcp: socket,
+              host: host,
+              port: port,
+            ),
+            mode: mode.Passive,
+            nat_workaround: False,
+            welcome_message: None,
+            passive_stream_builder: default_passive_stream_builder,
+            tls_options: Some(ssl_options),
+            data_timeout: default_timeout,
+          )
+        read_welcome_message(client)
+      }
       Error(e) -> Error(ftp_result.Tls(e))
     }
   })
@@ -750,6 +776,21 @@ pub fn read_lines_from_stream(
 // !internal functions
 // -------------------------------
 
+/// Read the server's welcome message (status 220 Ready) and return
+/// an updated FtpClient with the welcome_message field populated.
+fn read_welcome_message(client: FtpClient) -> FtpResult(FtpClient) {
+  case read_response(client, status.Ready) {
+    Ok(resp) -> {
+      let welcome_msg = case response.to_string(resp) {
+        Ok(msg) -> Some(msg)
+        Error(_) -> None
+      }
+      Ok(FtpClient(..client, welcome_message: welcome_msg))
+    }
+    Error(err) -> Error(err)
+  }
+}
+
 /// Key function to read a response from the server and check if it matches the expected status code.
 /// 
 /// It returns error if it fails to read a response or if the response status code doesn't match the expected status.
@@ -789,7 +830,10 @@ fn read_response_in(
     }
   })
 
-  let body = body |> list.map(bit_array.from_string) |> bit_array.concat
+  let body =
+    body
+    |> string.join("\n")
+    |> bit_array.from_string
   Ok(Response(status, body))
 }
 

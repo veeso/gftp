@@ -46,12 +46,12 @@ pub fn encode_dele_test() {
 
 pub fn encode_eprt_v4_test() {
   command.to_string(Eprt("192.168.1.1", 21, V4))
-  |> should.equal("EPRT|1|192.168.1.1|21")
+  |> should.equal("EPRT |1|192.168.1.1|21|")
 }
 
 pub fn encode_eprt_v6_test() {
   command.to_string(Eprt("::1", 21, V6))
-  |> should.equal("EPRT|2|::1|21")
+  |> should.equal("EPRT |2|::1|21|")
 }
 
 pub fn encode_epsv_test() {

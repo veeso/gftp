@@ -402,16 +402,15 @@ fn parse_list_dos(line: String, re: regexp.Regexp) -> ParseResult {
         False -> file_type.File
       }
 
-      let size = case size {
-        None -> 0
+      use size <- result.try(case size {
+        None -> Ok(0)
         Some(size_str) ->
           size_str
           |> string.trim()
           |> string.replace(",", "")
           |> int.parse()
-          |> result.map_error(fn(_) { BadSize })
-          |> result.unwrap(or: 0)
-      }
+          |> result.replace_error(BadSize)
+      })
 
       file.empty()
       |> file.with_name(name)

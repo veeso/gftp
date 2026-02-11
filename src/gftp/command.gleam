@@ -4,7 +4,6 @@ import gftp/command/file_type.{type FileType}
 import gftp/command/protection_level.{type ProtectionLevel}
 import gleam/int
 import gleam/option.{type Option}
-import gleam/string
 
 /// The `Command` type represents the different FTP commands that can be issued by the client.
 /// Each command corresponds to a specific action that the FTP server can perform,
@@ -93,14 +92,14 @@ pub type IpVersion {
 }
 
 /// Encode the `EPRT` command with the given host, port, and IP version.
+/// Per RFC 2428: EPRT<space><d><net-prt><d><net-addr><d><tcp-port><d>
 fn encode_eprt(host: String, port: Int, ip_version: IpVersion) -> String {
   let ip_version_str = case ip_version {
     V4 -> "1"
     V6 -> "2"
   }
 
-  ["EPRT", ip_version_str, host, int.to_string(port)]
-  |> string.join("|")
+  "EPRT |" <> ip_version_str <> "|" <> host <> "|" <> int.to_string(port) <> "|"
 }
 
 pub fn to_string(command: Command) -> String {

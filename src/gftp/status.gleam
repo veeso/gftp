@@ -100,7 +100,7 @@ pub fn describe(status: Status) -> String {
     RequestedActionNotTaken -> "requested action not taken"
     BadCommand -> "syntax error command unrecognized"
     BadArguments -> "syntax error in parameters or arguments"
-    NotImplemented -> "comamnd not implemented"
+    NotImplemented -> "command not implemented"
     BadSequence -> "bad sequence of commands"
     NotImplementedParameter -> "command not implemented for that parameter"
     NotLoggedIn -> "user not logged in"
@@ -108,7 +108,7 @@ pub fn describe(status: Status) -> String {
     FileUnavailable -> "requested action not taken; file unavailable"
     PageTypeUnknown -> "requested action aborted; page type unknown"
     ExceededStorage ->
-      "requested file action aborted; execeeded storage allocation"
+      "requested file action aborted; exceeded storage allocation"
     BadFilename -> "requested action not taken; file name not allowed"
     Unknown -> "unknown error code"
   }
