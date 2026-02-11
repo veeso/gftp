@@ -118,8 +118,7 @@ pub fn encode_pbsz_test() {
 }
 
 pub fn encode_port_test() {
-  let assert "PORT 192,168,1,1,4,1" =
-    command.to_string(Port("192,168,1,1,4,1"))
+  let assert "PORT 192,168,1,1,4,1" = command.to_string(Port("192,168,1,1,4,1"))
 }
 
 pub fn encode_prot_clear_test() {

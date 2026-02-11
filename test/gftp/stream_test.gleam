@@ -76,7 +76,8 @@ pub fn send_tcp_test() {
   let client_socket = connect_client(port)
   let server_socket = accept(listen_socket)
 
-  let assert Ok(_) = stream.send(Tcp(client_socket), <<"hello from client":utf8>>)
+  let assert Ok(_) =
+    stream.send(Tcp(client_socket), <<"hello from client":utf8>>)
 
   let assert Ok(<<"hello from client":utf8>>) = server_recv(server_socket, 5000)
 
