@@ -34,6 +34,7 @@ Further documentation can be found at <https://hexdocs.pm/gftp>.
 ```sh
 gleam run   # Run the project
 gleam test  # Run the tests
+GFTP_INTEGRATION_TESTS=1 gleam test  # Run the integration tests
 ```
 
 ## License

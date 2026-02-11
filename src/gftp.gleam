@@ -1047,12 +1047,7 @@ fn read_lines_from_stream_loop(
 ) -> FtpResult(List(String)) {
   case read_line_with(data_stream, timeout) {
     Ok(line) -> read_lines_from_stream_loop([line, ..acc], data_stream, timeout)
-    Error(e) ->
-      case e {
-        ftp_result.BadResponse -> Error(e)
-        // fixme: check error; this should be empty case
-        ftp_result.Socket(_) -> acc |> list.reverse |> Ok
-        _ -> Error(e)
-      }
+    Error(ftp_result.Socket(mug.Closed)) -> acc |> list.reverse |> Ok
+    Error(e) -> Error(e)
   }
 }
