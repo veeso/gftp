@@ -3,95 +3,94 @@ import gftp/list/file_type
 import gftp/list/permission.{FilePermissions, PosixPermission}
 import gleam/option.{None, Some}
 import gleam/time/timestamp
-import gleeunit/should
 
 pub fn empty_file_name_test() {
-  file.empty()
-  |> file.name
-  |> should.equal("")
+  let assert "" =
+    file.empty()
+    |> file.name
 }
 
 pub fn empty_file_type_test() {
-  file.empty()
-  |> file.file_type
-  |> should.equal(file_type.File)
+  let assert file_type.File =
+    file.empty()
+    |> file.file_type
 }
 
 pub fn empty_file_size_test() {
-  file.empty()
-  |> file.size
-  |> should.equal(0)
+  let assert 0 =
+    file.empty()
+    |> file.size
 }
 
 pub fn empty_file_modified_test() {
-  file.empty()
-  |> file.modified
-  |> should.equal(None)
+  let assert None =
+    file.empty()
+    |> file.modified
 }
 
 pub fn empty_file_uid_test() {
-  file.empty()
-  |> file.uid
-  |> should.equal(None)
+  let assert None =
+    file.empty()
+    |> file.uid
 }
 
 pub fn empty_file_gid_test() {
-  file.empty()
-  |> file.gid
-  |> should.equal(None)
+  let assert None =
+    file.empty()
+    |> file.gid
 }
 
 pub fn empty_file_permissions_test() {
-  file.empty()
-  |> file.permissions
-  |> should.equal(None)
+  let assert None =
+    file.empty()
+    |> file.permissions
 }
 
 pub fn empty_file_symlink_target_test() {
-  file.empty()
-  |> file.symlink_target
-  |> should.equal(None)
+  let assert None =
+    file.empty()
+    |> file.symlink_target
 }
 
 pub fn with_name_test() {
-  file.empty()
-  |> file.with_name("test.txt")
-  |> file.name
-  |> should.equal("test.txt")
+  let assert "test.txt" =
+    file.empty()
+    |> file.with_name("test.txt")
+    |> file.name
 }
 
 pub fn with_file_type_directory_test() {
-  file.empty()
-  |> file.with_file_type(file_type.Directory)
-  |> file.file_type
-  |> should.equal(file_type.Directory)
+  let assert file_type.Directory =
+    file.empty()
+    |> file.with_file_type(file_type.Directory)
+    |> file.file_type
 }
 
 pub fn with_file_type_symlink_test() {
   let f =
     file.empty()
     |> file.with_file_type(file_type.Symlink("/target"))
-  f
-  |> file.file_type
-  |> should.equal(file_type.Symlink("/target"))
-  f
-  |> file.symlink_target
-  |> should.equal(Some("/target"))
+  let assert file_type.Symlink("/target") =
+    f
+    |> file.file_type
+  let assert Some("/target") =
+    f
+    |> file.symlink_target
 }
 
 pub fn with_size_test() {
-  file.empty()
-  |> file.with_size(4096)
-  |> file.size
-  |> should.equal(4096)
+  let assert 4096 =
+    file.empty()
+    |> file.with_size(4096)
+    |> file.size
 }
 
 pub fn with_modified_test() {
   let ts = timestamp.from_unix_seconds(1_604_583_960)
-  file.empty()
-  |> file.with_modified(ts)
-  |> file.modified
-  |> should.equal(Some(ts))
+  let assert Some(_) =
+    file.empty()
+    |> file.with_modified(ts)
+    |> file.modified
 }
 
 pub fn with_permissions_test() {
@@ -101,36 +100,36 @@ pub fn with_permissions_test() {
       group: PosixPermission(read: True, write: False, execute: False),
       others: PosixPermission(read: True, write: False, execute: False),
     )
-  file.empty()
-  |> file.with_permissions(perms)
-  |> file.permissions
-  |> should.equal(Some(perms))
+  let assert Some(_) =
+    file.empty()
+    |> file.with_permissions(perms)
+    |> file.permissions
 }
 
 pub fn with_uid_test() {
-  file.empty()
-  |> file.with_uid(1000)
-  |> file.uid
-  |> should.equal(Some(1000))
+  let assert Some(1000) =
+    file.empty()
+    |> file.with_uid(1000)
+    |> file.uid
 }
 
 pub fn with_gid_test() {
-  file.empty()
-  |> file.with_gid(1000)
-  |> file.gid
-  |> should.equal(Some(1000))
+  let assert Some(1000) =
+    file.empty()
+    |> file.with_gid(1000)
+    |> file.gid
 }
 
 pub fn symlink_target_on_non_symlink_test() {
-  file.empty()
-  |> file.with_file_type(file_type.File)
-  |> file.symlink_target
-  |> should.equal(None)
+  let assert None =
+    file.empty()
+    |> file.with_file_type(file_type.File)
+    |> file.symlink_target
 }
 
 pub fn symlink_target_on_directory_test() {
-  file.empty()
-  |> file.with_file_type(file_type.Directory)
-  |> file.symlink_target
-  |> should.equal(None)
+  let assert None =
+    file.empty()
+    |> file.with_file_type(file_type.Directory)
+    |> file.symlink_target
 }

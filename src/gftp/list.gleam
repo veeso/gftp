@@ -1,26 +1,45 @@
-//// This module exposes the parser for `LIST`, `MLSD`, and `MLST` commands.
-//// 
-//// 
-//// Please note that there's no guarantee this parser works with `LIST` and the reason is quite simple.
-//// There's no specification regarding the LIST command output, so it basically depends on the implementation of the
-//// remote FTP server. Despite this though, this parser, has worked on all the ftp server I've used.
-//// If you find a variant which doesn't work with this parser,
-//// please feel free to report an issue to <https://github.com/veeso/gftp>.
+//// Parsers for FTP directory listing formats: `LIST` (POSIX and DOS), `MLSD`, and `MLST`.
 ////
-//// ## Get started
+//// ## LIST parsing
 ////
-//// Whenever you receive the output for your LIST command, all you have to do is to iterate over lines and
-//// call `File::from_str` function as shown in the example.
+//// The `LIST` output format is not standardized and depends on the FTP server.
+//// This parser supports both POSIX and DOS formats, trying POSIX first.
+//// If you find a format that doesn't parse correctly, please report an issue
+//// at <https://github.com/veeso/gftp>.
 ////
 //// ```gleam
-//// import gftp/list/file.{type File}
-//// import gftp/list.{parse_list}
-//// import gleam/result
+//// import gftp/list
+//// import gftp/list/file
 ////
-//// // imagine this line received from a LIST command
-//// let line = "-rw-r--r-- 1 user group 1234 Nov 5 13:46 example.txt";
+//// let line = "-rw-r--r-- 1 user group 1234 Nov 5 13:46 example.txt"
+//// let assert Ok(f) = list.parse_list(line)
+//// let name = file.name(f) // "example.txt"
+//// let size = file.size(f) // 1234
+//// ```
 ////
-//// let file = line |> parse_list |> result.unwrap
+//// ## MLSD/MLST parsing (RFC 3659)
+////
+//// Machine-readable listing formats provide structured, standardized output:
+////
+//// ```gleam
+//// import gftp/list
+//// import gftp/list/file
+////
+//// let line = "type=file;size=1234;modify=20200105134600; example.txt"
+//// let assert Ok(f) = list.parse_mlsd(line)
+//// let name = file.name(f) // "example.txt"
+//// ```
+////
+//// ## Usage with gftp
+////
+//// ```gleam
+//// import gftp
+//// import gftp/list
+//// import gleam/list as gleam_list
+//// import gleam/option.{None}
+////
+//// let assert Ok(lines) = gftp.list(client, None)
+//// let assert Ok(files) = gleam_list.try_map(lines, list.parse_list)
 //// ```
 
 import gftp/list/file.{type File}
@@ -68,23 +87,37 @@ pub fn describe_error(error: ParseError) -> String {
   }
 }
 
-/// Parse any line from a `MLSD` command output, 
-/// returning a `File` data structure with the extracted metadata on success, or a `ParseError` on failure.
+/// Parse a line from `MLSD` command output into a `File`.
+///
+/// ```gleam
+/// let line = "type=file;size=1024;modify=20200105134600; readme.txt"
+/// let assert Ok(f) = list.parse_mlsd(line)
+/// ```
 pub fn parse_mlsd(line: String) -> ParseResult {
   parse_mlsd_mlst_line(line)
 }
 
-/// Parse any line from a `MLST` command output, 
-/// returning a `File` data structure with the extracted metadata on success, or a `ParseError` on failure.
+/// Parse a line from `MLST` command output into a `File`.
+///
+/// ```gleam
+/// let line = "type=file;size=2048;modify=20210315120000; document.pdf"
+/// let assert Ok(f) = list.parse_mlst(line)
+/// ```
 pub fn parse_mlst(line: String) -> ParseResult {
   parse_mlsd_mlst_line(line)
 }
 
-/// Parse the output of a `LIST` command, which can be in either POSIX or DOS format,
-/// returning a `File` data structure with the extracted metadata on success,
-/// or a `ParseError` on failure.
-/// The parser will first attempt to parse the line as POSIX format,
-/// and if that fails, it will attempt to parse it as DOS format.
+/// Parse a `LIST` output line (POSIX or DOS format) into a `File`.
+///
+/// Tries POSIX format first, then falls back to DOS format.
+///
+/// ```gleam
+/// // POSIX format
+/// let assert Ok(f) = list.parse_list("-rw-r--r-- 1 user group 1234 Nov 5 13:46 example.txt")
+///
+/// // DOS format
+/// let assert Ok(f) = list.parse_list("10-19-20  03:19PM       403 readme.txt")
+/// ```
 pub fn parse_list(line: String) -> ParseResult {
   let assert Ok(posix_re) = regexp.from_string(posix_list_regex)
   let assert Ok(dos_re) = regexp.from_string(dos_list_regex)

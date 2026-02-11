@@ -7,229 +7,186 @@ import gftp/command.{
 import gftp/command/file_type
 import gftp/command/protection_level
 import gleam/option.{None, Some}
-import gleeunit/should
 
 pub fn encode_abor_test() {
-  command.to_string(Abor)
-  |> should.equal("ABOR")
+  let assert "ABOR" = command.to_string(Abor)
 }
 
 pub fn encode_appe_test() {
-  command.to_string(Appe("upload.txt"))
-  |> should.equal("APPE upload.txt")
+  let assert "APPE upload.txt" = command.to_string(Appe("upload.txt"))
 }
 
 pub fn encode_auth_test() {
-  command.to_string(Auth)
-  |> should.equal("AUTH TLS")
+  let assert "AUTH TLS" = command.to_string(Auth)
 }
 
 pub fn encode_ccc_test() {
-  command.to_string(ClearCommandChannel)
-  |> should.equal("CCC")
+  let assert "CCC" = command.to_string(ClearCommandChannel)
 }
 
 pub fn encode_cdup_test() {
-  command.to_string(Cdup)
-  |> should.equal("CDUP")
+  let assert "CDUP" = command.to_string(Cdup)
 }
 
 pub fn encode_cwd_test() {
-  command.to_string(Cwd("/home/user"))
-  |> should.equal("CWD /home/user")
+  let assert "CWD /home/user" = command.to_string(Cwd("/home/user"))
 }
 
 pub fn encode_dele_test() {
-  command.to_string(Dele("old_file.txt"))
-  |> should.equal("DELE old_file.txt")
+  let assert "DELE old_file.txt" = command.to_string(Dele("old_file.txt"))
 }
 
 pub fn encode_eprt_v4_test() {
-  command.to_string(Eprt("192.168.1.1", 21, V4))
-  |> should.equal("EPRT |1|192.168.1.1|21|")
+  let assert "EPRT |1|192.168.1.1|21|" =
+    command.to_string(Eprt("192.168.1.1", 21, V4))
 }
 
 pub fn encode_eprt_v6_test() {
-  command.to_string(Eprt("::1", 21, V6))
-  |> should.equal("EPRT |2|::1|21|")
+  let assert "EPRT |2|::1|21|" = command.to_string(Eprt("::1", 21, V6))
 }
 
 pub fn encode_epsv_test() {
-  command.to_string(Epsv)
-  |> should.equal("EPSV")
+  let assert "EPSV" = command.to_string(Epsv)
 }
 
 pub fn encode_feat_test() {
-  command.to_string(Feat)
-  |> should.equal("FEAT")
+  let assert "FEAT" = command.to_string(Feat)
 }
 
 pub fn encode_list_with_path_test() {
-  command.to_string(List(Some("/home")))
-  |> should.equal("LIST /home")
+  let assert "LIST /home" = command.to_string(List(Some("/home")))
 }
 
 pub fn encode_list_without_path_test() {
-  command.to_string(List(None))
-  |> should.equal("LIST")
+  let assert "LIST" = command.to_string(List(None))
 }
 
 pub fn encode_mdtm_test() {
-  command.to_string(Mdtm("file.txt"))
-  |> should.equal("MDTM file.txt")
+  let assert "MDTM file.txt" = command.to_string(Mdtm("file.txt"))
 }
 
 pub fn encode_mlsd_with_path_test() {
-  command.to_string(Mlsd(Some("/data")))
-  |> should.equal("MLSD /data")
+  let assert "MLSD /data" = command.to_string(Mlsd(Some("/data")))
 }
 
 pub fn encode_mlsd_without_path_test() {
-  command.to_string(Mlsd(None))
-  |> should.equal("MLSD")
+  let assert "MLSD" = command.to_string(Mlsd(None))
 }
 
 pub fn encode_mlst_with_path_test() {
-  command.to_string(Mlst(Some("file.txt")))
-  |> should.equal("MLST file.txt")
+  let assert "MLST file.txt" = command.to_string(Mlst(Some("file.txt")))
 }
 
 pub fn encode_mlst_without_path_test() {
-  command.to_string(Mlst(None))
-  |> should.equal("MLST")
+  let assert "MLST" = command.to_string(Mlst(None))
 }
 
 pub fn encode_mkd_test() {
-  command.to_string(Mkd("new_dir"))
-  |> should.equal("MKD new_dir")
+  let assert "MKD new_dir" = command.to_string(Mkd("new_dir"))
 }
 
 pub fn encode_nlst_with_path_test() {
-  command.to_string(Nlst(Some("/files")))
-  |> should.equal("NLST /files")
+  let assert "NLST /files" = command.to_string(Nlst(Some("/files")))
 }
 
 pub fn encode_nlst_without_path_test() {
-  command.to_string(Nlst(None))
-  |> should.equal("NLST")
+  let assert "NLST" = command.to_string(Nlst(None))
 }
 
 pub fn encode_noop_test() {
-  command.to_string(Noop)
-  |> should.equal("NOOP")
+  let assert "NOOP" = command.to_string(Noop)
 }
 
 pub fn encode_opts_with_options_test() {
-  command.to_string(Opts("UTF8", Some("ON")))
-  |> should.equal("OPTS UTF8 ON")
+  let assert "OPTS UTF8 ON" = command.to_string(Opts("UTF8", Some("ON")))
 }
 
 pub fn encode_opts_without_options_test() {
-  command.to_string(Opts("UTF8", None))
-  |> should.equal("OPTS UTF8")
+  let assert "OPTS UTF8" = command.to_string(Opts("UTF8", None))
 }
 
 pub fn encode_pass_test() {
-  command.to_string(Pass("secret"))
-  |> should.equal("PASS secret")
+  let assert "PASS secret" = command.to_string(Pass("secret"))
 }
 
 pub fn encode_pasv_test() {
-  command.to_string(Pasv)
-  |> should.equal("PASV")
+  let assert "PASV" = command.to_string(Pasv)
 }
 
 pub fn encode_pbsz_test() {
-  command.to_string(Pbsz(0))
-  |> should.equal("PBSZ 0")
+  let assert "PBSZ 0" = command.to_string(Pbsz(0))
 }
 
 pub fn encode_port_test() {
-  command.to_string(Port("192,168,1,1,4,1"))
-  |> should.equal("PORT 192,168,1,1,4,1")
+  let assert "PORT 192,168,1,1,4,1" = command.to_string(Port("192,168,1,1,4,1"))
 }
 
 pub fn encode_prot_clear_test() {
-  command.to_string(Prot(protection_level.Clear))
-  |> should.equal("PROT C")
+  let assert "PROT C" = command.to_string(Prot(protection_level.Clear))
 }
 
 pub fn encode_prot_private_test() {
-  command.to_string(Prot(protection_level.Private))
-  |> should.equal("PROT P")
+  let assert "PROT P" = command.to_string(Prot(protection_level.Private))
 }
 
 pub fn encode_pwd_test() {
-  command.to_string(Pwd)
-  |> should.equal("PWD")
+  let assert "PWD" = command.to_string(Pwd)
 }
 
 pub fn encode_quit_test() {
-  command.to_string(Quit)
-  |> should.equal("QUIT")
+  let assert "QUIT" = command.to_string(Quit)
 }
 
 pub fn encode_rename_from_test() {
-  command.to_string(RenameFrom("old.txt"))
-  |> should.equal("RNFR old.txt")
+  let assert "RNFR old.txt" = command.to_string(RenameFrom("old.txt"))
 }
 
 pub fn encode_rename_to_test() {
-  command.to_string(RenameTo("new.txt"))
-  |> should.equal("RNTO new.txt")
+  let assert "RNTO new.txt" = command.to_string(RenameTo("new.txt"))
 }
 
 pub fn encode_rest_test() {
-  command.to_string(Rest(1024))
-  |> should.equal("REST 1024")
+  let assert "REST 1024" = command.to_string(Rest(1024))
 }
 
 pub fn encode_retr_test() {
-  command.to_string(Retr("download.txt"))
-  |> should.equal("RETR download.txt")
+  let assert "RETR download.txt" = command.to_string(Retr("download.txt"))
 }
 
 pub fn encode_rmd_test() {
-  command.to_string(Rmd("old_dir"))
-  |> should.equal("RMD old_dir")
+  let assert "RMD old_dir" = command.to_string(Rmd("old_dir"))
 }
 
 pub fn encode_site_test() {
-  command.to_string(Site("CHMOD 755 file.txt"))
-  |> should.equal("SITE CHMOD 755 file.txt")
+  let assert "SITE CHMOD 755 file.txt" =
+    command.to_string(Site("CHMOD 755 file.txt"))
 }
 
 pub fn encode_size_test() {
-  command.to_string(Size("file.bin"))
-  |> should.equal("SIZE file.bin")
+  let assert "SIZE file.bin" = command.to_string(Size("file.bin"))
 }
 
 pub fn encode_store_test() {
-  command.to_string(Stor("upload.bin"))
-  |> should.equal("STOR upload.bin")
+  let assert "STOR upload.bin" = command.to_string(Stor("upload.bin"))
 }
 
 pub fn encode_type_ascii_default_test() {
-  command.to_string(Type(file_type.Ascii(file_type.Default)))
-  |> should.equal("TYPE A N")
+  let assert "TYPE A N" =
+    command.to_string(Type(file_type.Ascii(file_type.Default)))
 }
 
 pub fn encode_type_image_test() {
-  command.to_string(Type(file_type.Image))
-  |> should.equal("TYPE I")
+  let assert "TYPE I" = command.to_string(Type(file_type.Image))
 }
 
 pub fn encode_type_binary_test() {
-  command.to_string(Type(file_type.Binary))
-  |> should.equal("TYPE I")
+  let assert "TYPE I" = command.to_string(Type(file_type.Binary))
 }
 
 pub fn encode_user_test() {
-  command.to_string(User("anonymous"))
-  |> should.equal("USER anonymous")
+  let assert "USER anonymous" = command.to_string(User("anonymous"))
 }
 
 pub fn encode_custom_test() {
-  command.to_string(Custom("XCRC file.txt"))
-  |> should.equal("XCRC file.txt")
+  let assert "XCRC file.txt" = command.to_string(Custom("XCRC file.txt"))
 }

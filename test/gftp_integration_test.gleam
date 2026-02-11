@@ -10,7 +10,6 @@ import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
 import gleam/string
-import gleeunit/should
 import kafein
 
 @external(erlang, "stream_test_ffi", "get_env")
@@ -85,7 +84,7 @@ pub fn connect_and_login_test() {
 pub fn welcome_message_test() {
   with_ftp_connection(fn(client) {
     let msg = gftp.welcome_message(client)
-    msg |> should.not_equal(None)
+    let assert False = msg == None
     Nil
   })
 }
@@ -102,7 +101,7 @@ pub fn noop_test() {
 pub fn pwd_test() {
   with_ftp_connection(fn(client) {
     let assert Ok(pwd) = gftp.pwd(client)
-    pwd |> should.equal("/home/test")
+    let assert "/home/test" = pwd
     Nil
   })
 }
@@ -112,7 +111,7 @@ pub fn cwd_test() {
     let assert Ok(pwd) = gftp.pwd(client)
     let assert Ok(_) = gftp.cwd(client, "/")
     let assert Ok(new_pwd) = gftp.pwd(client)
-    new_pwd |> should.equal("/")
+    let assert "/" = new_pwd
     let assert Ok(_) = gftp.cwd(client, pwd)
     Nil
   })
@@ -123,7 +122,7 @@ pub fn cdup_test() {
     let assert Ok(_) = gftp.cwd(client, "/home/test")
     let assert Ok(_) = gftp.cdup(client)
     let assert Ok(pwd) = gftp.pwd(client)
-    pwd |> should.equal("/home")
+    let assert "/home" = pwd
     Nil
   })
 }
@@ -135,7 +134,7 @@ pub fn mkd_and_rmd_test() {
     let assert Ok(_) = gftp.mkd(client, "test_dir")
     let assert Ok(_) = gftp.cwd(client, "test_dir")
     let assert Ok(pwd) = gftp.pwd(client)
-    pwd |> should.equal("/home/test/test_dir")
+    let assert "/home/test/test_dir" = pwd
     let assert Ok(_) = gftp.cdup(client)
     let assert Ok(_) = gftp.rmd(client, "test_dir")
     Nil
@@ -174,7 +173,7 @@ pub fn stor_and_retr_test() {
       gftp.retr(client, "test_file.txt", fn(data_stream) {
         let assert Ok(data) = stream.receive(data_stream, 5000)
         let assert Ok(text) = bit_array.to_string(data)
-        text |> should.equal(content)
+        let assert True = text == content
         Ok(Nil)
       })
     let assert Ok(_) = gftp.dele(client, "test_file.txt")
@@ -202,7 +201,7 @@ pub fn appe_test() {
       gftp.retr(client, "append_test.txt", fn(data_stream) {
         let assert Ok(data) = stream.receive(data_stream, 5000)
         let assert Ok(text) = bit_array.to_string(data)
-        text |> should.equal("Hello, World!")
+        let assert "Hello, World!" = text
         Ok(Nil)
       })
     let assert Ok(_) = gftp.dele(client, "append_test.txt")
@@ -222,7 +221,7 @@ pub fn dele_test() {
     // Delete it
     let assert Ok(_) = gftp.dele(client, "to_delete.txt")
     // Verify it's gone by trying to get its size (should fail)
-    gftp.size(client, "to_delete.txt") |> should.be_error
+    let assert Error(_) = gftp.size(client, "to_delete.txt")
     Nil
   })
 }
@@ -239,13 +238,13 @@ pub fn rename_test() {
     // Rename it
     let assert Ok(_) = gftp.rename(client, "original.txt", "renamed.txt")
     // Verify old name is gone
-    gftp.size(client, "original.txt") |> should.be_error
+    let assert Error(_) = gftp.size(client, "original.txt")
     // Verify new name exists and has correct content
     let assert Ok(_) =
       gftp.retr(client, "renamed.txt", fn(data_stream) {
         let assert Ok(data) = stream.receive(data_stream, 5000)
         let assert Ok(text) = bit_array.to_string(data)
-        text |> should.equal("rename me")
+        let assert "rename me" = text
         Ok(Nil)
       })
     let assert Ok(_) = gftp.dele(client, "renamed.txt")
@@ -263,7 +262,7 @@ pub fn size_test() {
         |> result.map_error(ftp_result.Socket)
       })
     let assert Ok(file_size) = gftp.size(client, "size_test.txt")
-    file_size |> should.equal(10)
+    let assert 10 = file_size
     let assert Ok(_) = gftp.dele(client, "size_test.txt")
     Nil
   })
@@ -299,7 +298,7 @@ pub fn list_test() {
     // Should contain the file we created
     let has_file =
       lines |> list.any(fn(line) { string.contains(line, "list_test.txt") })
-    has_file |> should.be_true
+    let assert True = has_file
     let assert Ok(_) = gftp.dele(client, "list_test.txt")
     Nil
   })
@@ -324,7 +323,7 @@ pub fn nlst_test() {
     let assert Ok(names) = gftp.nlst(client, None)
     let has_file =
       names |> list.any(fn(name) { string.contains(name, "nlst_test.txt") })
-    has_file |> should.be_true
+    let assert True = has_file
     let assert Ok(_) = gftp.dele(client, "nlst_test.txt")
     Nil
   })
@@ -340,14 +339,14 @@ pub fn feat_test() {
   with_ftp_connection(fn(client) {
     let assert Ok(features) = gftp.feat(client)
     // vsftpd supports these features
-    dict.has_key(features, "EPRT") |> should.be_true
-    dict.has_key(features, "EPSV") |> should.be_true
-    dict.has_key(features, "MDTM") |> should.be_true
-    dict.has_key(features, "PASV") |> should.be_true
-    dict.has_key(features, "SIZE") |> should.be_true
-    dict.has_key(features, "UTF8") |> should.be_true
+    let assert True = dict.has_key(features, "EPRT")
+    let assert True = dict.has_key(features, "EPSV")
+    let assert True = dict.has_key(features, "MDTM")
+    let assert True = dict.has_key(features, "PASV")
+    let assert True = dict.has_key(features, "SIZE")
+    let assert True = dict.has_key(features, "UTF8")
     // REST has a value "STREAM"
-    dict.get(features, "REST") |> should.equal(Ok(Some("STREAM")))
+    let assert Ok(Some("STREAM")) = dict.get(features, "REST")
     Nil
   })
 }
@@ -371,10 +370,10 @@ pub fn site_test() {
 
 pub fn custom_command_test() {
   with_ftp_connection(fn(client) {
-    let assert Ok(resp) = gftp.custom_command(client, "SYST", [status.System])
+    let assert Ok(resp) = gftp.custom_command(client, "SYST", [status.Name])
     let assert Ok(body) = response.to_string(resp)
     // vsftpd typically returns "UNIX Type: L8"
-    body |> string.contains("UNIX") |> should.be_true
+    let assert True = string.contains(body, "UNIX")
     Nil
   })
 }
@@ -395,7 +394,7 @@ pub fn rest_test() {
       gftp.retr(client, "rest_test.txt", fn(data_stream) {
         let assert Ok(data) = stream.receive(data_stream, 5000)
         let assert Ok(text) = bit_array.to_string(data)
-        text |> should.equal("ABCDEF")
+        let assert "ABCDEF" = text
         Ok(Nil)
       })
     let assert Ok(_) = gftp.dele(client, "rest_test.txt")
@@ -441,7 +440,7 @@ pub fn active_mode_list_test() {
     let has_file =
       lines
       |> list.any(fn(line) { string.contains(line, "active_list_test.txt") })
-    has_file |> should.be_true
+    let assert True = has_file
     let assert Ok(_) = gftp.dele(client, "active_list_test.txt")
     Nil
   })
@@ -460,7 +459,7 @@ pub fn active_mode_stor_and_retr_test() {
       gftp.retr(client, "active_test.txt", fn(data_stream) {
         let assert Ok(data) = stream.receive(data_stream, 5000)
         let assert Ok(text) = bit_array.to_string(data)
-        text |> should.equal(content)
+        let assert True = text == content
         Ok(Nil)
       })
     let assert Ok(_) = gftp.dele(client, "active_test.txt")
@@ -480,7 +479,7 @@ pub fn active_mode_nlst_test() {
     let has_file =
       names
       |> list.any(fn(name) { string.contains(name, "active_nlst_test.txt") })
-    has_file |> should.be_true
+    let assert True = has_file
     let assert Ok(_) = gftp.dele(client, "active_nlst_test.txt")
     Nil
   })
@@ -515,7 +514,7 @@ fn with_ftps_connection(callback: fn(FtpClient) -> Nil) -> Nil {
 pub fn ftps_connect_and_login_test() {
   with_ftps_connection(fn(client) {
     let assert Ok(pwd) = gftp.pwd(client)
-    pwd |> should.equal("/home/test")
+    let assert "/home/test" = pwd
     Nil
   })
 }
@@ -533,7 +532,7 @@ pub fn ftps_stor_and_retr_test() {
       gftp.retr(client, "ftps_test.txt", fn(data_stream) {
         let assert Ok(data) = stream.receive(data_stream, 5000)
         let assert Ok(text) = bit_array.to_string(data)
-        text |> should.equal(content)
+        let assert True = text == content
         Ok(Nil)
       })
     let assert Ok(_) = gftp.dele(client, "ftps_test.txt")

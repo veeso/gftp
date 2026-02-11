@@ -10,480 +10,405 @@ import gftp/status.{
   RequestedActionNotTaken, RequestedFileActionOk, RestartMarker,
   StoringNeedAccount, System, TransferAborted, Unknown,
 }
-import gleeunit/should
 
 // --- from_int tests ---
 
 pub fn from_int_restart_marker_test() {
-  status.from_int(110)
-  |> should.equal(RestartMarker)
+  let assert RestartMarker = status.from_int(110)
 }
 
 pub fn from_int_ready_minute_test() {
-  status.from_int(120)
-  |> should.equal(ReadyMinute)
+  let assert ReadyMinute = status.from_int(120)
 }
 
 pub fn from_int_already_open_test() {
-  status.from_int(125)
-  |> should.equal(AlreadyOpen)
+  let assert AlreadyOpen = status.from_int(125)
 }
 
 pub fn from_int_about_to_send_test() {
-  status.from_int(150)
-  |> should.equal(AboutToSend)
+  let assert AboutToSend = status.from_int(150)
 }
 
 pub fn from_int_command_ok_test() {
-  status.from_int(200)
-  |> should.equal(CommandOk)
+  let assert CommandOk = status.from_int(200)
 }
 
 pub fn from_int_command_not_implemented_test() {
-  status.from_int(202)
-  |> should.equal(CommandNotImplemented)
+  let assert CommandNotImplemented = status.from_int(202)
 }
 
 pub fn from_int_system_test() {
-  status.from_int(211)
-  |> should.equal(System)
+  let assert System = status.from_int(211)
 }
 
 pub fn from_int_directory_test() {
-  status.from_int(212)
-  |> should.equal(Directory)
+  let assert Directory = status.from_int(212)
 }
 
 pub fn from_int_file_test() {
-  status.from_int(213)
-  |> should.equal(File)
+  let assert File = status.from_int(213)
 }
 
 pub fn from_int_help_test() {
-  status.from_int(214)
-  |> should.equal(Help)
+  let assert Help = status.from_int(214)
 }
 
 pub fn from_int_name_test() {
-  status.from_int(215)
-  |> should.equal(Name)
+  let assert Name = status.from_int(215)
 }
 
 pub fn from_int_ready_test() {
-  status.from_int(220)
-  |> should.equal(Ready)
+  let assert Ready = status.from_int(220)
 }
 
 pub fn from_int_closing_test() {
-  status.from_int(221)
-  |> should.equal(Closing)
+  let assert Closing = status.from_int(221)
 }
 
 pub fn from_int_data_connection_open_test() {
-  status.from_int(225)
-  |> should.equal(DataConnectionOpen)
+  let assert DataConnectionOpen = status.from_int(225)
 }
 
 pub fn from_int_closing_data_connection_test() {
-  status.from_int(226)
-  |> should.equal(ClosingDataConnection)
+  let assert ClosingDataConnection = status.from_int(226)
 }
 
 pub fn from_int_passive_mode_test() {
-  status.from_int(227)
-  |> should.equal(PassiveMode)
+  let assert PassiveMode = status.from_int(227)
 }
 
 pub fn from_int_long_passive_mode_test() {
-  status.from_int(228)
-  |> should.equal(LongPassiveMode)
+  let assert LongPassiveMode = status.from_int(228)
 }
 
 pub fn from_int_extended_passive_mode_test() {
-  status.from_int(229)
-  |> should.equal(ExtendedPassiveMode)
+  let assert ExtendedPassiveMode = status.from_int(229)
 }
 
 pub fn from_int_logged_in_test() {
-  status.from_int(230)
-  |> should.equal(LoggedIn)
+  let assert LoggedIn = status.from_int(230)
 }
 
 pub fn from_int_logged_out_test() {
-  status.from_int(231)
-  |> should.equal(LoggedOut)
+  let assert LoggedOut = status.from_int(231)
 }
 
 pub fn from_int_logout_ack_test() {
-  status.from_int(232)
-  |> should.equal(LogoutAck)
+  let assert LogoutAck = status.from_int(232)
 }
 
 pub fn from_int_auth_ok_test() {
-  status.from_int(234)
-  |> should.equal(AuthOk)
+  let assert AuthOk = status.from_int(234)
 }
 
 pub fn from_int_requested_file_action_ok_test() {
-  status.from_int(250)
-  |> should.equal(RequestedFileActionOk)
+  let assert RequestedFileActionOk = status.from_int(250)
 }
 
 pub fn from_int_path_created_test() {
-  status.from_int(257)
-  |> should.equal(PathCreated)
+  let assert PathCreated = status.from_int(257)
 }
 
 pub fn from_int_need_password_test() {
-  status.from_int(331)
-  |> should.equal(NeedPassword)
+  let assert NeedPassword = status.from_int(331)
 }
 
 pub fn from_int_login_need_account_test() {
-  status.from_int(332)
-  |> should.equal(LoginNeedAccount)
+  let assert LoginNeedAccount = status.from_int(332)
 }
 
 pub fn from_int_request_file_pending_test() {
-  status.from_int(350)
-  |> should.equal(RequestFilePending)
+  let assert RequestFilePending = status.from_int(350)
 }
 
 pub fn from_int_not_available_test() {
-  status.from_int(421)
-  |> should.equal(NotAvailable)
+  let assert NotAvailable = status.from_int(421)
 }
 
 pub fn from_int_cannot_open_data_connection_test() {
-  status.from_int(425)
-  |> should.equal(CannotOpenDataConnection)
+  let assert CannotOpenDataConnection = status.from_int(425)
 }
 
 pub fn from_int_transfer_aborted_test() {
-  status.from_int(426)
-  |> should.equal(TransferAborted)
+  let assert TransferAborted = status.from_int(426)
 }
 
 pub fn from_int_invalid_credentials_test() {
-  status.from_int(430)
-  |> should.equal(InvalidCredentials)
+  let assert InvalidCredentials = status.from_int(430)
 }
 
 pub fn from_int_host_unavailable_test() {
-  status.from_int(434)
-  |> should.equal(HostUnavailable)
+  let assert HostUnavailable = status.from_int(434)
 }
 
 pub fn from_int_request_file_action_ignored_test() {
-  status.from_int(450)
-  |> should.equal(RequestFileActionIgnored)
+  let assert RequestFileActionIgnored = status.from_int(450)
 }
 
 pub fn from_int_action_aborted_test() {
-  status.from_int(451)
-  |> should.equal(ActionAborted)
+  let assert ActionAborted = status.from_int(451)
 }
 
 pub fn from_int_requested_action_not_taken_test() {
-  status.from_int(452)
-  |> should.equal(RequestedActionNotTaken)
+  let assert RequestedActionNotTaken = status.from_int(452)
 }
 
 pub fn from_int_bad_command_test() {
-  status.from_int(500)
-  |> should.equal(BadCommand)
+  let assert BadCommand = status.from_int(500)
 }
 
 pub fn from_int_bad_arguments_test() {
-  status.from_int(501)
-  |> should.equal(BadArguments)
+  let assert BadArguments = status.from_int(501)
 }
 
 pub fn from_int_not_implemented_test() {
-  status.from_int(502)
-  |> should.equal(NotImplemented)
+  let assert NotImplemented = status.from_int(502)
 }
 
 pub fn from_int_bad_sequence_test() {
-  status.from_int(503)
-  |> should.equal(BadSequence)
+  let assert BadSequence = status.from_int(503)
 }
 
 pub fn from_int_not_implemented_parameter_test() {
-  status.from_int(504)
-  |> should.equal(NotImplementedParameter)
+  let assert NotImplementedParameter = status.from_int(504)
 }
 
 pub fn from_int_not_logged_in_test() {
-  status.from_int(530)
-  |> should.equal(NotLoggedIn)
+  let assert NotLoggedIn = status.from_int(530)
 }
 
 pub fn from_int_storing_need_account_test() {
-  status.from_int(532)
-  |> should.equal(StoringNeedAccount)
+  let assert StoringNeedAccount = status.from_int(532)
 }
 
 pub fn from_int_file_unavailable_test() {
-  status.from_int(550)
-  |> should.equal(FileUnavailable)
+  let assert FileUnavailable = status.from_int(550)
 }
 
 pub fn from_int_page_type_unknown_test() {
-  status.from_int(551)
-  |> should.equal(PageTypeUnknown)
+  let assert PageTypeUnknown = status.from_int(551)
 }
 
 pub fn from_int_exceeded_storage_test() {
-  status.from_int(552)
-  |> should.equal(ExceededStorage)
+  let assert ExceededStorage = status.from_int(552)
 }
 
 pub fn from_int_bad_filename_test() {
-  status.from_int(553)
-  |> should.equal(BadFilename)
+  let assert BadFilename = status.from_int(553)
 }
 
 pub fn from_int_unknown_test() {
-  status.from_int(999)
-  |> should.equal(Unknown)
+  let assert Unknown = status.from_int(999)
 }
 
 // --- description tests ---
 
 pub fn description_restart_marker_test() {
-  status.describe(RestartMarker)
-  |> should.equal("restart marker reply")
+  let assert "restart marker reply" = status.describe(RestartMarker)
 }
 
 pub fn description_ready_minute_test() {
-  status.describe(ReadyMinute)
-  |> should.equal("service ready in (n) minutes")
+  let assert "service ready in (n) minutes" = status.describe(ReadyMinute)
 }
 
 pub fn description_already_open_test() {
-  status.describe(AlreadyOpen)
-  |> should.equal("data connection already open transfer starting")
+  let assert "data connection already open transfer starting" =
+    status.describe(AlreadyOpen)
 }
 
 pub fn description_about_to_send_test() {
-  status.describe(AboutToSend)
-  |> should.equal("file status okay about to open data connection")
+  let assert "file status okay about to open data connection" =
+    status.describe(AboutToSend)
 }
 
 pub fn description_command_ok_test() {
-  status.describe(CommandOk)
-  |> should.equal("command okay")
+  let assert "command okay" = status.describe(CommandOk)
 }
 
 pub fn description_command_not_implemented_test() {
-  status.describe(CommandNotImplemented)
-  |> should.equal("command not implemented")
+  let assert "command not implemented" = status.describe(CommandNotImplemented)
 }
 
 pub fn description_system_test() {
-  status.describe(System)
-  |> should.equal("system status or system help reply")
+  let assert "system status or system help reply" = status.describe(System)
 }
 
 pub fn description_directory_test() {
-  status.describe(Directory)
-  |> should.equal("directory status")
+  let assert "directory status" = status.describe(Directory)
 }
 
 pub fn description_file_test() {
-  status.describe(File)
-  |> should.equal("file status")
+  let assert "file status" = status.describe(File)
 }
 
 pub fn description_help_test() {
-  status.describe(Help)
-  |> should.equal("help message")
+  let assert "help message" = status.describe(Help)
 }
 
 pub fn description_name_test() {
-  status.describe(Name)
-  |> should.equal("NAME system type")
+  let assert "NAME system type" = status.describe(Name)
 }
 
 pub fn description_ready_test() {
-  status.describe(Ready)
-  |> should.equal("service ready for new user")
+  let assert "service ready for new user" = status.describe(Ready)
 }
 
 pub fn description_closing_test() {
-  status.describe(Closing)
-  |> should.equal("service closing control connection")
+  let assert "service closing control connection" = status.describe(Closing)
 }
 
 pub fn description_data_connection_open_test() {
-  status.describe(DataConnectionOpen)
-  |> should.equal("data connection open; no transfer in progress")
+  let assert "data connection open; no transfer in progress" =
+    status.describe(DataConnectionOpen)
 }
 
 pub fn description_closing_data_connection_test() {
-  status.describe(ClosingDataConnection)
-  |> should.equal("closing data connection")
+  let assert "closing data connection" = status.describe(ClosingDataConnection)
 }
 
 pub fn description_passive_mode_test() {
-  status.describe(PassiveMode)
-  |> should.equal("entering passive mode")
+  let assert "entering passive mode" = status.describe(PassiveMode)
 }
 
 pub fn description_long_passive_mode_test() {
-  status.describe(LongPassiveMode)
-  |> should.equal("entering long passive mode")
+  let assert "entering long passive mode" = status.describe(LongPassiveMode)
 }
 
 pub fn description_extended_passive_mode_test() {
-  status.describe(ExtendedPassiveMode)
-  |> should.equal("entering extended passive mode")
+  let assert "entering extended passive mode" =
+    status.describe(ExtendedPassiveMode)
 }
 
 pub fn description_logged_in_test() {
-  status.describe(LoggedIn)
-  |> should.equal("user logged in proceed. Logged out if appropriate.")
+  let assert "user logged in proceed. Logged out if appropriate." =
+    status.describe(LoggedIn)
 }
 
 pub fn description_logged_out_test() {
-  status.describe(LoggedOut)
-  |> should.equal("user logged out; service terminated")
+  let assert "user logged out; service terminated" = status.describe(LoggedOut)
 }
 
 pub fn description_logout_ack_test() {
-  status.describe(LogoutAck)
-  |> should.equal("logout command noted will complete when transfer done")
+  let assert "logout command noted will complete when transfer done" =
+    status.describe(LogoutAck)
 }
 
 pub fn description_auth_ok_test() {
-  status.describe(AuthOk)
-  |> should.equal(
-    "specifies that the server accepts the authentication mechanism specified by the client",
-  )
+  let assert "specifies that the server accepts the authentication mechanism specified by the client" =
+    status.describe(AuthOk)
 }
 
 pub fn description_requested_file_action_ok_test() {
-  status.describe(RequestedFileActionOk)
-  |> should.equal("requested file action okay")
+  let assert "requested file action okay" =
+    status.describe(RequestedFileActionOk)
 }
 
 pub fn description_path_created_test() {
-  status.describe(PathCreated)
-  |> should.equal("pathname created")
+  let assert "pathname created" = status.describe(PathCreated)
 }
 
 pub fn description_need_password_test() {
-  status.describe(NeedPassword)
-  |> should.equal("user name okay need password")
+  let assert "user name okay need password" = status.describe(NeedPassword)
 }
 
 pub fn description_login_need_account_test() {
-  status.describe(LoginNeedAccount)
-  |> should.equal("need account for login")
+  let assert "need account for login" = status.describe(LoginNeedAccount)
 }
 
 pub fn description_request_file_pending_test() {
-  status.describe(RequestFilePending)
-  |> should.equal("requested file action pending further information")
+  let assert "requested file action pending further information" =
+    status.describe(RequestFilePending)
 }
 
 pub fn description_not_available_test() {
-  status.describe(NotAvailable)
-  |> should.equal("service not available closing control connection")
+  let assert "service not available closing control connection" =
+    status.describe(NotAvailable)
 }
 
 pub fn description_cannot_open_data_connection_test() {
-  status.describe(CannotOpenDataConnection)
-  |> should.equal("can't open data connection")
+  let assert "can't open data connection" =
+    status.describe(CannotOpenDataConnection)
 }
 
 pub fn description_transfer_aborted_test() {
-  status.describe(TransferAborted)
-  |> should.equal("connection closed; transfer aborted")
+  let assert "connection closed; transfer aborted" =
+    status.describe(TransferAborted)
 }
 
 pub fn description_invalid_credentials_test() {
-  status.describe(InvalidCredentials)
-  |> should.equal("invalid username or password")
+  let assert "invalid username or password" =
+    status.describe(InvalidCredentials)
 }
 
 pub fn description_host_unavailable_test() {
-  status.describe(HostUnavailable)
-  |> should.equal("requested host unavailable")
+  let assert "requested host unavailable" = status.describe(HostUnavailable)
 }
 
 pub fn description_request_file_action_ignored_test() {
-  status.describe(RequestFileActionIgnored)
-  |> should.equal("requested file action not taken")
+  let assert "requested file action not taken" =
+    status.describe(RequestFileActionIgnored)
 }
 
 pub fn description_action_aborted_test() {
-  status.describe(ActionAborted)
-  |> should.equal("requested action aborted")
+  let assert "requested action aborted" = status.describe(ActionAborted)
 }
 
 pub fn description_requested_action_not_taken_test() {
-  status.describe(RequestedActionNotTaken)
-  |> should.equal("requested action not taken")
+  let assert "requested action not taken" =
+    status.describe(RequestedActionNotTaken)
 }
 
 pub fn description_bad_command_test() {
-  status.describe(BadCommand)
-  |> should.equal("syntax error command unrecognized")
+  let assert "syntax error command unrecognized" = status.describe(BadCommand)
 }
 
 pub fn description_bad_arguments_test() {
-  status.describe(BadArguments)
-  |> should.equal("syntax error in parameters or arguments")
+  let assert "syntax error in parameters or arguments" =
+    status.describe(BadArguments)
 }
 
 pub fn description_not_implemented_test() {
-  status.describe(NotImplemented)
-  |> should.equal("command not implemented")
+  let assert "command not implemented" = status.describe(NotImplemented)
 }
 
 pub fn description_bad_sequence_test() {
-  status.describe(BadSequence)
-  |> should.equal("bad sequence of commands")
+  let assert "bad sequence of commands" = status.describe(BadSequence)
 }
 
 pub fn description_not_implemented_parameter_test() {
-  status.describe(NotImplementedParameter)
-  |> should.equal("command not implemented for that parameter")
+  let assert "command not implemented for that parameter" =
+    status.describe(NotImplementedParameter)
 }
 
 pub fn description_not_logged_in_test() {
-  status.describe(NotLoggedIn)
-  |> should.equal("user not logged in")
+  let assert "user not logged in" = status.describe(NotLoggedIn)
 }
 
 pub fn description_storing_need_account_test() {
-  status.describe(StoringNeedAccount)
-  |> should.equal("need account for storing files")
+  let assert "need account for storing files" =
+    status.describe(StoringNeedAccount)
 }
 
 pub fn description_file_unavailable_test() {
-  status.describe(FileUnavailable)
-  |> should.equal("requested action not taken; file unavailable")
+  let assert "requested action not taken; file unavailable" =
+    status.describe(FileUnavailable)
 }
 
 pub fn description_page_type_unknown_test() {
-  status.describe(PageTypeUnknown)
-  |> should.equal("requested action aborted; page type unknown")
+  let assert "requested action aborted; page type unknown" =
+    status.describe(PageTypeUnknown)
 }
 
 pub fn description_exceeded_storage_test() {
-  status.describe(ExceededStorage)
-  |> should.equal("requested file action aborted; exceeded storage allocation")
+  let assert "requested file action aborted; exceeded storage allocation" =
+    status.describe(ExceededStorage)
 }
 
 pub fn description_bad_filename_test() {
-  status.describe(BadFilename)
-  |> should.equal("requested action not taken; file name not allowed")
+  let assert "requested action not taken; file name not allowed" =
+    status.describe(BadFilename)
 }
 
 pub fn description_unknown_test() {
-  status.describe(Unknown)
-  |> should.equal("unknown error code")
+  let assert "unknown error code" = status.describe(Unknown)
 }

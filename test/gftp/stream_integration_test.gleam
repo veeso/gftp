@@ -1,7 +1,6 @@
 import gftp/stream.{Ssl, Tcp}
 import gleam/bit_array
 import gleam/string
-import gleeunit/should
 import kafein
 import mug
 
@@ -115,18 +114,14 @@ pub fn integration_send_receive_ssl_test() {
       // Send an HTTP GET request
       let request =
         "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n"
-      stream.send(ssl_stream, <<request:utf8>>)
-      |> should.be_ok()
+      let assert Ok(_) = stream.send(ssl_stream, <<request:utf8>>)
 
       // Receive the response
-      let response_bytes =
-        stream.receive(ssl_stream, 10_000)
-        |> should.be_ok()
+      let assert Ok(response_bytes) = stream.receive(ssl_stream, 10_000)
 
       // Verify it looks like an HTTP response
       let assert Ok(response_text) = bit_array.to_string(response_bytes)
-      string.starts_with(response_text, "HTTP/1.1")
-      |> should.be_true()
+      let assert True = string.starts_with(response_text, "HTTP/1.1")
 
       let _ = stream.shutdown(ssl_stream)
       Nil
@@ -145,8 +140,8 @@ pub fn integration_shutdown_ssl_test() {
       let assert Ok(ssl_stream) =
         stream.upgrade_to_ssl(tcp_stream, ssl_options(host))
 
-      stream.shutdown(ssl_stream)
-      |> should.be_ok()
+      let assert Ok(_) = stream.shutdown(ssl_stream)
+      Nil
     }
   }
 }

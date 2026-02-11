@@ -1,5 +1,4 @@
 import gftp/stream.{Tcp}
-import gleeunit/should
 import mug
 
 // Opaque types for server-side sockets (gen_tcp)
@@ -45,9 +44,8 @@ pub fn receive_tcp_test() {
 
   server_send(server_socket, <<"hello world":utf8>>)
 
-  stream.receive(Tcp(client_socket), 5000)
-  |> should.be_ok()
-  |> should.equal(<<"hello world":utf8>>)
+  let assert Ok(<<"hello world":utf8>>) =
+    stream.receive(Tcp(client_socket), 5000)
 
   close_server(server_socket)
   close_listen(listen_socket)
@@ -63,9 +61,8 @@ pub fn receive_exact_tcp_test() {
 
   server_send(server_socket, <<"hello world":utf8>>)
 
-  stream.receive_exact(Tcp(client_socket), 1, 5000)
-  |> should.be_ok()
-  |> should.equal(<<"h":utf8>>)
+  let assert Ok(<<"h":utf8>>) =
+    stream.receive_exact(Tcp(client_socket), 1, 5000)
 
   close_server(server_socket)
   close_listen(listen_socket)
@@ -79,12 +76,10 @@ pub fn send_tcp_test() {
   let client_socket = connect_client(port)
   let server_socket = accept(listen_socket)
 
-  stream.send(Tcp(client_socket), <<"hello from client":utf8>>)
-  |> should.be_ok()
+  let assert Ok(_) =
+    stream.send(Tcp(client_socket), <<"hello from client":utf8>>)
 
-  server_recv(server_socket, 5000)
-  |> should.be_ok()
-  |> should.equal(<<"hello from client":utf8>>)
+  let assert Ok(<<"hello from client":utf8>>) = server_recv(server_socket, 5000)
 
   close_server(server_socket)
   close_listen(listen_socket)
@@ -98,8 +93,7 @@ pub fn shutdown_tcp_test() {
   let client_socket = connect_client(port)
   let server_socket = accept(listen_socket)
 
-  stream.shutdown(Tcp(client_socket))
-  |> should.be_ok()
+  let assert Ok(_) = stream.shutdown(Tcp(client_socket))
 
   close_server(server_socket)
   close_listen(listen_socket)
@@ -112,8 +106,7 @@ pub fn receive_tcp_timeout_test() {
   let server_socket = accept(listen_socket)
 
   // No data sent, so receive should timeout
-  stream.receive(Tcp(client_socket), 100)
-  |> should.be_error()
+  let assert Error(_) = stream.receive(Tcp(client_socket), 100)
 
   close_server(server_socket)
   close_listen(listen_socket)
@@ -128,8 +121,7 @@ pub fn receive_exact_tcp_timeout_test() {
   let server_socket = accept(listen_socket)
 
   // No data sent, so receive_exact should timeout
-  stream.receive_exact(Tcp(client_socket), 1, 100)
-  |> should.be_error()
+  let assert Error(_) = stream.receive_exact(Tcp(client_socket), 1, 100)
 
   close_server(server_socket)
   close_listen(listen_socket)
@@ -144,8 +136,8 @@ pub fn peer_address_tcp_test() {
   let _server_socket = accept(listen_socket)
 
   let assert Ok(#(ip, peer_port)) = stream.peer_address(Tcp(client_socket))
-  should.equal(ip, "127.0.0.1")
-  should.equal(peer_port, port)
+  let assert "127.0.0.1" = ip
+  let assert True = peer_port == port
 
   close_listen(listen_socket)
   let _ = stream.shutdown(Tcp(client_socket))
@@ -158,8 +150,8 @@ pub fn local_address_tcp_test() {
   let client_socket = connect_client(port)
 
   let assert Ok(#(ip, local_port)) = stream.local_address(Tcp(client_socket))
-  should.equal(ip, "127.0.0.1")
-  should.be_true(local_port > 0)
+  let assert "127.0.0.1" = ip
+  let assert True = local_port > 0
 
   close_listen(listen_socket)
   let _ = stream.shutdown(Tcp(client_socket))
