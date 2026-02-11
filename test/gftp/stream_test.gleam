@@ -45,13 +45,13 @@ pub fn receive_tcp_test() {
 
   server_send(server_socket, <<"hello world":utf8>>)
 
-  stream.receive(Tcp(client_socket, "127.0.0.1", port), 5000)
+  stream.receive(Tcp(client_socket), 5000)
   |> should.be_ok()
   |> should.equal(<<"hello world":utf8>>)
 
   close_server(server_socket)
   close_listen(listen_socket)
-  let _ = stream.shutdown(Tcp(client_socket, "127.0.0.1", port))
+  let _ = stream.shutdown(Tcp(client_socket))
   Nil
 }
 
@@ -63,13 +63,13 @@ pub fn receive_exact_tcp_test() {
 
   server_send(server_socket, <<"hello world":utf8>>)
 
-  stream.receive_exact(Tcp(client_socket, "127.0.0.1", port), 1, 5000)
+  stream.receive_exact(Tcp(client_socket), 1, 5000)
   |> should.be_ok()
   |> should.equal(<<"h":utf8>>)
 
   close_server(server_socket)
   close_listen(listen_socket)
-  let _ = stream.shutdown(Tcp(client_socket, "127.0.0.1", port))
+  let _ = stream.shutdown(Tcp(client_socket))
   Nil
 }
 
@@ -79,9 +79,7 @@ pub fn send_tcp_test() {
   let client_socket = connect_client(port)
   let server_socket = accept(listen_socket)
 
-  stream.send(Tcp(client_socket, "127.0.0.1", port), <<
-    "hello from client":utf8,
-  >>)
+  stream.send(Tcp(client_socket), <<"hello from client":utf8>>)
   |> should.be_ok()
 
   server_recv(server_socket, 5000)
@@ -90,7 +88,7 @@ pub fn send_tcp_test() {
 
   close_server(server_socket)
   close_listen(listen_socket)
-  let _ = stream.shutdown(Tcp(client_socket, "127.0.0.1", port))
+  let _ = stream.shutdown(Tcp(client_socket))
   Nil
 }
 
@@ -100,7 +98,7 @@ pub fn shutdown_tcp_test() {
   let client_socket = connect_client(port)
   let server_socket = accept(listen_socket)
 
-  stream.shutdown(Tcp(client_socket, "127.0.0.1", port))
+  stream.shutdown(Tcp(client_socket))
   |> should.be_ok()
 
   close_server(server_socket)
@@ -114,12 +112,12 @@ pub fn receive_tcp_timeout_test() {
   let server_socket = accept(listen_socket)
 
   // No data sent, so receive should timeout
-  stream.receive(Tcp(client_socket, "127.0.0.1", port), 100)
+  stream.receive(Tcp(client_socket), 100)
   |> should.be_error()
 
   close_server(server_socket)
   close_listen(listen_socket)
-  let _ = stream.shutdown(Tcp(client_socket, "127.0.0.1", port))
+  let _ = stream.shutdown(Tcp(client_socket))
   Nil
 }
 
@@ -130,20 +128,40 @@ pub fn receive_exact_tcp_timeout_test() {
   let server_socket = accept(listen_socket)
 
   // No data sent, so receive_exact should timeout
-  stream.receive_exact(Tcp(client_socket, "127.0.0.1", port), 1, 100)
+  stream.receive_exact(Tcp(client_socket), 1, 100)
   |> should.be_error()
 
   close_server(server_socket)
   close_listen(listen_socket)
-  let _ = stream.shutdown(Tcp(client_socket, "127.0.0.1", port))
+  let _ = stream.shutdown(Tcp(client_socket))
   Nil
 }
 
-pub fn socket_address_tcp_test() {
+pub fn peer_address_tcp_test() {
+  let listen_socket = listen()
+  let port = listen_port(listen_socket)
+  let client_socket = connect_client(port)
+  let _server_socket = accept(listen_socket)
+
+  let assert Ok(#(ip, peer_port)) = stream.peer_address(Tcp(client_socket))
+  should.equal(ip, "127.0.0.1")
+  should.equal(peer_port, port)
+
+  close_listen(listen_socket)
+  let _ = stream.shutdown(Tcp(client_socket))
+  Nil
+}
+
+pub fn local_address_tcp_test() {
   let listen_socket = listen()
   let port = listen_port(listen_socket)
   let client_socket = connect_client(port)
 
-  let address = stream.socket_address(Tcp(client_socket, "127.0.0.1", port))
-  assert address == #("127.0.0.1", port)
+  let assert Ok(#(ip, local_port)) = stream.local_address(Tcp(client_socket))
+  should.equal(ip, "127.0.0.1")
+  should.be_true(local_port > 0)
+
+  close_listen(listen_socket)
+  let _ = stream.shutdown(Tcp(client_socket))
+  Nil
 }

@@ -22,6 +22,12 @@ fn start_ftp_container() -> String
 @external(erlang, "test_container_ffi", "get_ftp_port")
 fn get_ftp_port(container_id: String) -> Int
 
+@external(erlang, "test_container_ffi", "start_ftp_active_container")
+fn start_ftp_active_container() -> String
+
+@external(erlang, "test_container_ffi", "get_ftp_active_port")
+fn get_ftp_active_port(container_id: String) -> Int
+
 @external(erlang, "test_container_ffi", "start_ftps_container")
 fn start_ftps_container() -> String
 
@@ -33,6 +39,13 @@ fn stop_container(container_id: String) -> Nil
 
 fn require_integration() -> Bool {
   case get_env("GFTP_INTEGRATION_TESTS") {
+    Ok(_) -> True
+    Error(_) -> False
+  }
+}
+
+fn require_active_mode() -> Bool {
+  case get_env("GFTP_ACTIVE_MODE_TESTS") {
     Ok(_) -> True
     Error(_) -> False
   }
@@ -386,6 +399,89 @@ pub fn rest_test() {
         Ok(Nil)
       })
     let assert Ok(_) = gftp.dele(client, "rest_test.txt")
+    Nil
+  })
+}
+
+// --- Active mode tests ---
+// These tests require --network host Docker mode (Linux only).
+// With host networking, the FTP server can connect back to the client's
+// listener on 127.0.0.1 for active mode data transfers.
+
+/// Run an integration test with an FTP connection in active mode.
+/// Starts a Docker FTP container with --network host, connects, logs in,
+/// switches to active mode, runs the callback, then cleans up.
+/// Skipped unless GFTP_INTEGRATION_TESTS env var is set.
+fn with_ftp_active_connection(callback: fn(FtpClient) -> Nil) -> Nil {
+  case require_active_mode() {
+    False -> Nil
+    True -> {
+      let container_id = start_ftp_active_container()
+      let port = get_ftp_active_port(container_id)
+      let assert Ok(client) =
+        gftp.connect_timeout("127.0.0.1", port, timeout: 30_000)
+      let assert Ok(_) = gftp.login(client, "test", "test")
+      let client = gftp.with_active_mode(client, 30_000)
+      callback(client)
+      let assert Ok(_) = gftp.quit(client)
+      stop_container(container_id)
+    }
+  }
+}
+
+pub fn active_mode_list_test() {
+  with_ftp_active_connection(fn(client) {
+    let assert Ok(_) = gftp.transfer_type(client, file_type.Binary)
+    let assert Ok(_) =
+      gftp.stor(client, "active_list_test.txt", fn(data_stream) {
+        stream.send(data_stream, bit_array.from_string("test"))
+        |> result.map_error(ftp_result.Socket)
+      })
+    let assert Ok(lines) = gftp.list(client, None)
+    let has_file =
+      lines
+      |> list.any(fn(line) { string.contains(line, "active_list_test.txt") })
+    has_file |> should.be_true
+    let assert Ok(_) = gftp.dele(client, "active_list_test.txt")
+    Nil
+  })
+}
+
+pub fn active_mode_stor_and_retr_test() {
+  with_ftp_active_connection(fn(client) {
+    let assert Ok(_) = gftp.transfer_type(client, file_type.Binary)
+    let content = "Hello, active mode!"
+    let assert Ok(_) =
+      gftp.stor(client, "active_test.txt", fn(data_stream) {
+        stream.send(data_stream, bit_array.from_string(content))
+        |> result.map_error(ftp_result.Socket)
+      })
+    let assert Ok(_) =
+      gftp.retr(client, "active_test.txt", fn(data_stream) {
+        let assert Ok(data) = stream.receive(data_stream, 5000)
+        let assert Ok(text) = bit_array.to_string(data)
+        text |> should.equal(content)
+        Ok(Nil)
+      })
+    let assert Ok(_) = gftp.dele(client, "active_test.txt")
+    Nil
+  })
+}
+
+pub fn active_mode_nlst_test() {
+  with_ftp_active_connection(fn(client) {
+    let assert Ok(_) = gftp.transfer_type(client, file_type.Binary)
+    let assert Ok(_) =
+      gftp.stor(client, "active_nlst_test.txt", fn(data_stream) {
+        stream.send(data_stream, bit_array.from_string("test"))
+        |> result.map_error(ftp_result.Socket)
+      })
+    let assert Ok(names) = gftp.nlst(client, None)
+    let has_file =
+      names
+      |> list.any(fn(name) { string.contains(name, "active_nlst_test.txt") })
+    has_file |> should.be_true
+    let assert Ok(_) = gftp.dele(client, "active_nlst_test.txt")
     Nil
   })
 }

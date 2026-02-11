@@ -62,6 +62,7 @@ import gftp/command.{type Command}
 import gftp/command/feat.{type Features}
 import gftp/command/file_type
 import gftp/command/protection_level
+import gftp/listener
 import gftp/mode.{type Mode}
 import gftp/response.{type Response, Response}
 import gftp/result.{type FtpResult} as ftp_result
@@ -167,7 +168,7 @@ pub fn connect_timeout(
   )
   |> mug.connect()
   |> result.map_error(ftp_result.ConnectionError)
-  |> result.try(fn(socket) { connect_with_stream(socket, host, port) })
+  |> result.try(fn(socket) { connect_with_stream(socket) })
 }
 
 /// Connect to the FTP server using an existing socket stream.
@@ -177,14 +178,10 @@ pub fn connect_timeout(
 /// 
 /// On success, returns a `FtpClient` instance that can be used to interact with the FTP server.
 /// On failure, returns an `FtpError` describing the issue.
-pub fn connect_with_stream(
-  stream: mug.Socket,
-  host: String,
-  port: Int,
-) -> FtpResult(FtpClient) {
+pub fn connect_with_stream(stream: mug.Socket) -> FtpResult(FtpClient) {
   let client =
     FtpClient(
-      data_stream: stream.Tcp(stream, host: host, port: port),
+      data_stream: stream.Tcp(stream),
       mode: mode.Passive,
       nat_workaround: False,
       welcome_message: None,
@@ -282,12 +279,7 @@ pub fn connect_secure_implicit(
       Ok(ssl_socket) -> {
         let client =
           FtpClient(
-            data_stream: stream.Ssl(
-              ssl: ssl_socket,
-              tcp: socket,
-              host: host,
-              port: port,
-            ),
+            data_stream: stream.Ssl(ssl: ssl_socket, tcp: socket),
             mode: mode.Passive,
             nat_workaround: False,
             welcome_message: None,
@@ -947,7 +939,7 @@ fn default_passive_stream_builder(
   mug.new(host, port)
   |> mug.connect()
   |> result.map_error(ftp_result.ConnectionError)
-  |> result.map(fn(socket) { stream.Tcp(socket, host, port) })
+  |> result.map(fn(socket) { stream.Tcp(socket) })
 }
 
 /// Execute command which send data back in a separate stream.
@@ -966,11 +958,57 @@ fn data_command(
 
 /// Execute a data command in active mode, which requires the client to listen for an incoming connection from the server for the data transfer.
 fn data_command_active(
-  _ftp_client: FtpClient,
-  _command: Command,
-  _timeout: Int,
+  ftp_client: FtpClient,
+  command: Command,
+  timeout: Int,
 ) -> FtpResult(DataStream) {
-  todo as "Requires additional libs"
+  // Create a TCP listener on an ephemeral port
+  use listen_socket <- result.try(
+    listener.listen()
+    |> result.map_error(ftp_result.Socket),
+  )
+  // Get the assigned port
+  use listen_port <- result.try(
+    listener.port(listen_socket)
+    |> result.map_error(ftp_result.Socket),
+  )
+  // Get the local IP of the control connection
+  use #(local_ip, _) <- result.try(
+    stream.local_address(ftp_client.data_stream)
+    |> result.map_error(ftp_result.Socket),
+  )
+  // Send PORT command with the local IP and port
+  let port_string = build_active_port_arg(local_ip, listen_port)
+  use _ <- result.try(perform(ftp_client, command.Port(port_string)))
+  use _ <- result.try(read_response(ftp_client, status.CommandOk))
+  // Send the actual data command (RETR, STOR, etc.)
+  use _ <- result.try(perform(ftp_client, command))
+  // Accept the incoming connection from the server
+  let accept_result =
+    listener.accept(listen_socket, timeout)
+    |> result.map_error(ftp_result.Socket)
+  // Always close the listener
+  listener.close(listen_socket)
+  use accepted_socket <- result.try(accept_result)
+  // Wrap as a DataStream
+  let data_stream = stream.Tcp(accepted_socket)
+  // Upgrade to TLS if configured
+  case ftp_client.tls_options {
+    Some(ssl_options) ->
+      data_stream
+      |> stream.upgrade_to_ssl(ssl_options)
+      |> result.map_error(ftp_result.Tls)
+    None -> Ok(data_stream)
+  }
+}
+
+/// Build the PORT command argument string from an IP address and port.
+/// Format: "h1,h2,h3,h4,p1,p2" where h1-h4 are IP octets and p1,p2 are port MSB,LSB.
+fn build_active_port_arg(ip: String, port: Int) -> String {
+  let ip_part = string.replace(ip, ".", ",")
+  let msb = port / 256
+  let lsb = port % 256
+  ip_part <> "," <> int.to_string(msb) <> "," <> int.to_string(lsb)
 }
 
 /// Execute a data command in passive mode, which requires the client to connect to the server at the specified address
@@ -986,14 +1024,15 @@ fn data_command_passive(
   ))
   use _ <- result.try(perform(ftp_client, command))
 
-  let #(address, port) = case ftp_client.nat_workaround {
-    False -> #(address, port)
+  use #(address, port) <- result.try(case ftp_client.nat_workaround {
+    False -> Ok(#(address, port))
     True -> {
       ftp_client.data_stream
-      |> stream.socket_address
-      |> fn(socket_addr) { #(socket_addr.0, port) }
+      |> stream.peer_address
+      |> result.map(fn(peer_addr) { #(peer_addr.0, port) })
+      |> result.map_error(ftp_result.Socket)
     }
-  }
+  })
 
   build_data_channel_stream(ftp_client, address, port)
 }
@@ -1011,7 +1050,11 @@ fn data_command_extended_passive(
   ))
   use port <- result.try(parse_epsv_address_from_response(response))
   use _ <- result.try(perform(ftp_client, command))
-  let address = stream.socket_address(ftp_client.data_stream).0
+  use #(address, _) <- result.try(
+    ftp_client.data_stream
+    |> stream.peer_address
+    |> result.map_error(ftp_result.Socket),
+  )
 
   build_data_channel_stream(ftp_client, address, port)
 }
