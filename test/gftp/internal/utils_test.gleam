@@ -1,5 +1,5 @@
+import gftp/internal/utils.{extract_str, parse_int, parse_month}
 import gftp/result as ftp_result
-import gftp/utils.{extract_str, parse_int, parse_month}
 import gleam/time/calendar
 
 pub fn extract_quoted_str() {

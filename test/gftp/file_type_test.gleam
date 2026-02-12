@@ -1,4 +1,4 @@
-import gftp/command/file_type.{
+import gftp/file_type.{
   Asa, Ascii, Binary, Default, Ebcdic, Image, Local, NonPrint, Telnet,
 }
 

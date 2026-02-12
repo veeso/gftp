@@ -1,11 +1,11 @@
-import gftp/command.{
+import gftp/file_type
+import gftp/internal/command.{
   Abor, Appe, Auth, Cdup, ClearCommandChannel, Custom, Cwd, Dele, Eprt, Epsv,
   Feat, List, Mdtm, Mkd, Mlsd, Mlst, Nlst, Noop, Opts, Pass, Pasv, Pbsz, Port,
   Prot, Pwd, Quit, RenameFrom, RenameTo, Rest, Retr, Rmd, Site, Size, Stor, Type,
   User, V4, V6,
 }
-import gftp/command/file_type
-import gftp/command/protection_level
+import gftp/internal/command/protection_level
 import gleam/option.{None, Some}
 
 pub fn encode_abor_test() {

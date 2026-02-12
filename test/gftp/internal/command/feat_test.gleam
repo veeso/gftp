@@ -1,4 +1,4 @@
-import gftp/command/feat
+import gftp/internal/command/feat
 import gleam/dict
 import gleam/option.{None, Some}
 
