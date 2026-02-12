@@ -131,15 +131,40 @@ pub opaque type Message {
   )
 
   // --- Open data channel (chunk guard, sets chunk=True) ---
-  OpenRetr(path: String, reply: Subject(FtpResult(DataStream)))
-  OpenStor(path: String, reply: Subject(FtpResult(DataStream)))
-  OpenAppe(path: String, reply: Subject(FtpResult(DataStream)))
-  OpenList(pathname: Option(String), reply: Subject(FtpResult(DataStream)))
-  OpenNlst(pathname: Option(String), reply: Subject(FtpResult(DataStream)))
-  OpenMlsd(pathname: Option(String), reply: Subject(FtpResult(DataStream)))
+  OpenRetr(
+    path: String,
+    caller: process.Pid,
+    reply: Subject(FtpResult(DataStream)),
+  )
+  OpenStor(
+    path: String,
+    caller: process.Pid,
+    reply: Subject(FtpResult(DataStream)),
+  )
+  OpenAppe(
+    path: String,
+    caller: process.Pid,
+    reply: Subject(FtpResult(DataStream)),
+  )
+  OpenList(
+    pathname: Option(String),
+    caller: process.Pid,
+    reply: Subject(FtpResult(DataStream)),
+  )
+  OpenNlst(
+    pathname: Option(String),
+    caller: process.Pid,
+    reply: Subject(FtpResult(DataStream)),
+  )
+  OpenMlsd(
+    pathname: Option(String),
+    caller: process.Pid,
+    reply: Subject(FtpResult(DataStream)),
+  )
   OpenDataCommand(
     command_str: String,
     expected_statuses: List(Status),
+    caller: process.Pid,
     reply: Subject(FtpResult(#(DataStream, Response))),
   )
 
@@ -404,53 +429,82 @@ pub fn custom_data_command(
 // --- Message-based streaming ---
 
 /// Open a data channel for downloading a file.
+///
+/// The returned `DataStream` has its controlling process set to the caller,
+/// so message-based I/O (`receive_next_packet_as_message`) works correctly.
 pub fn open_retr(handle: Handle, path: String) -> FtpResult(DataStream) {
-  actor.call(handle, default_call_timeout, OpenRetr(path, _))
+  let caller = process.self()
+  actor.call(handle, default_call_timeout, OpenRetr(path, caller, _))
 }
 
 /// Open a data channel for uploading a file.
+///
+/// The returned `DataStream` has its controlling process set to the caller,
+/// so message-based I/O (`receive_next_packet_as_message`) works correctly.
 pub fn open_stor(handle: Handle, path: String) -> FtpResult(DataStream) {
-  actor.call(handle, default_call_timeout, OpenStor(path, _))
+  let caller = process.self()
+  actor.call(handle, default_call_timeout, OpenStor(path, caller, _))
 }
 
 /// Open a data channel for appending to a file.
+///
+/// The returned `DataStream` has its controlling process set to the caller,
+/// so message-based I/O (`receive_next_packet_as_message`) works correctly.
 pub fn open_appe(handle: Handle, path: String) -> FtpResult(DataStream) {
-  actor.call(handle, default_call_timeout, OpenAppe(path, _))
+  let caller = process.self()
+  actor.call(handle, default_call_timeout, OpenAppe(path, caller, _))
 }
 
 /// Open a data channel for a LIST directory listing.
+///
+/// The returned `DataStream` has its controlling process set to the caller,
+/// so message-based I/O (`receive_next_packet_as_message`) works correctly.
 pub fn open_list(
   handle: Handle,
   pathname: Option(String),
 ) -> FtpResult(DataStream) {
-  actor.call(handle, default_call_timeout, OpenList(pathname, _))
+  let caller = process.self()
+  actor.call(handle, default_call_timeout, OpenList(pathname, caller, _))
 }
 
 /// Open a data channel for an NLST file name listing.
+///
+/// The returned `DataStream` has its controlling process set to the caller,
+/// so message-based I/O (`receive_next_packet_as_message`) works correctly.
 pub fn open_nlst(
   handle: Handle,
   pathname: Option(String),
 ) -> FtpResult(DataStream) {
-  actor.call(handle, default_call_timeout, OpenNlst(pathname, _))
+  let caller = process.self()
+  actor.call(handle, default_call_timeout, OpenNlst(pathname, caller, _))
 }
 
 /// Open a data channel for an MLSD machine-readable listing.
+///
+/// The returned `DataStream` has its controlling process set to the caller,
+/// so message-based I/O (`receive_next_packet_as_message`) works correctly.
 pub fn open_mlsd(
   handle: Handle,
   pathname: Option(String),
 ) -> FtpResult(DataStream) {
-  actor.call(handle, default_call_timeout, OpenMlsd(pathname, _))
+  let caller = process.self()
+  actor.call(handle, default_call_timeout, OpenMlsd(pathname, caller, _))
 }
 
 /// Open a data channel for a custom command.
+///
+/// The returned `DataStream` has its controlling process set to the caller,
+/// so message-based I/O (`receive_next_packet_as_message`) works correctly.
 pub fn open_data_command(
   handle: Handle,
   command_str: String,
   expected_statuses: List(Status),
 ) -> FtpResult(#(DataStream, Response)) {
+  let caller = process.self()
   actor.call(handle, default_call_timeout, OpenDataCommand(
     command_str,
     expected_statuses,
+    caller,
     _,
   ))
 }
@@ -602,32 +656,32 @@ fn handle_message(state: State, message: Message) -> actor.Next(State, Message) 
       })
 
     // --- Open data channel (chunk guard, sets chunk=True) ---
-    OpenRetr(path, reply) ->
-      guard_chunk_open(state, reply, fn(s) {
+    OpenRetr(path, caller, reply) ->
+      guard_chunk_open(state, caller, reply, fn(s) {
         data_channel.open_retr(s.client, path)
       })
-    OpenStor(path, reply) ->
-      guard_chunk_open(state, reply, fn(s) {
+    OpenStor(path, caller, reply) ->
+      guard_chunk_open(state, caller, reply, fn(s) {
         data_channel.open_stor(s.client, path)
       })
-    OpenAppe(path, reply) ->
-      guard_chunk_open(state, reply, fn(s) {
+    OpenAppe(path, caller, reply) ->
+      guard_chunk_open(state, caller, reply, fn(s) {
         data_channel.open_appe(s.client, path)
       })
-    OpenList(pathname, reply) ->
-      guard_chunk_open(state, reply, fn(s) {
+    OpenList(pathname, caller, reply) ->
+      guard_chunk_open(state, caller, reply, fn(s) {
         data_channel.open_list(s.client, pathname)
       })
-    OpenNlst(pathname, reply) ->
-      guard_chunk_open(state, reply, fn(s) {
+    OpenNlst(pathname, caller, reply) ->
+      guard_chunk_open(state, caller, reply, fn(s) {
         data_channel.open_nlst(s.client, pathname)
       })
-    OpenMlsd(pathname, reply) ->
-      guard_chunk_open(state, reply, fn(s) {
+    OpenMlsd(pathname, caller, reply) ->
+      guard_chunk_open(state, caller, reply, fn(s) {
         data_channel.open_mlsd(s.client, pathname)
       })
-    OpenDataCommand(command_str, expected_statuses, reply) ->
-      guard_chunk_open_pair(state, reply, fn(s) {
+    OpenDataCommand(command_str, expected_statuses, caller, reply) ->
+      guard_chunk_open_pair(state, caller, reply, fn(s) {
         data_channel.open_data_command(s.client, command_str, expected_statuses)
       })
 
@@ -674,9 +728,10 @@ fn guard_chunk(
 }
 
 /// Guard for open_* commands that return a `DataStream`.
-/// On success, sets `chunk = True`.
+/// On success, sets `chunk = True` and transfers socket ownership to the caller.
 fn guard_chunk_open(
   state: State,
+  caller: process.Pid,
   reply: Subject(FtpResult(DataStream)),
   operation: fn(State) -> FtpResult(DataStream),
 ) -> actor.Next(State, Message) {
@@ -687,20 +742,25 @@ fn guard_chunk_open(
     }
     False -> {
       let result = operation(state)
-      let new_chunk = case result {
-        Ok(_) -> True
-        Error(_) -> False
+      let #(new_chunk, final_result) = case result {
+        Ok(ds) ->
+          case stream.controlling_process(ds, caller) {
+            Ok(_) -> #(True, Ok(ds))
+            Error(e) -> #(False, Error(ftp_result.Socket(e)))
+          }
+        Error(e) -> #(False, Error(e))
       }
-      process.send(reply, result)
+      process.send(reply, final_result)
       actor.continue(State(..state, chunk: new_chunk))
     }
   }
 }
 
 /// Guard for open_data_command which returns a `#(DataStream, Response)`.
-/// On success, sets `chunk = True`.
+/// On success, sets `chunk = True` and transfers socket ownership to the caller.
 fn guard_chunk_open_pair(
   state: State,
+  caller: process.Pid,
   reply: Subject(FtpResult(#(DataStream, Response))),
   operation: fn(State) -> FtpResult(#(DataStream, Response)),
 ) -> actor.Next(State, Message) {
@@ -711,11 +771,15 @@ fn guard_chunk_open_pair(
     }
     False -> {
       let result = operation(state)
-      let new_chunk = case result {
-        Ok(_) -> True
-        Error(_) -> False
+      let #(new_chunk, final_result) = case result {
+        Ok(#(ds, resp)) ->
+          case stream.controlling_process(ds, caller) {
+            Ok(_) -> #(True, Ok(#(ds, resp)))
+            Error(e) -> #(False, Error(ftp_result.Socket(e)))
+          }
+        Error(e) -> #(False, Error(e))
       }
-      process.send(reply, result)
+      process.send(reply, final_result)
       actor.continue(State(..state, chunk: new_chunk))
     }
   }

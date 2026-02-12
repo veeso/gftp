@@ -14,7 +14,7 @@
 //// selectors and OTP actors.
 
 import gftp/result as ftp_result
-import gleam/erlang/process
+import gleam/erlang/process.{type Pid}
 import kafein.{type WrapOptions}
 import mug
 
@@ -37,6 +37,15 @@ fn set_ssl_packet_line(socket: kafein.SslSocket) -> Nil
 
 @external(erlang, "stream_ffi", "set_ssl_packet_raw")
 fn set_ssl_packet_raw(socket: kafein.SslSocket) -> Nil
+
+@external(erlang, "stream_ffi", "tcp_controlling_process")
+fn tcp_controlling_process(socket: mug.Socket, pid: Pid) -> Result(Nil, mug.Error)
+
+@external(erlang, "stream_ffi", "ssl_controlling_process")
+fn ssl_controlling_process(
+  socket: kafein.SslSocket,
+  pid: Pid,
+) -> Result(Nil, mug.Error)
 
 @external(erlang, "stream_ffi", "local_address")
 fn tcp_local_address(socket: mug.Socket) -> Result(#(String, Int), mug.Error)
@@ -212,6 +221,26 @@ pub fn select_stream_messages(
       kafein.SslError(_, err) -> StreamError(ftp_result.Tls(err))
     })
   })
+}
+
+/// Transfer socket ownership to a different process.
+///
+/// This is necessary when a data stream is created in one process (e.g. an OTP actor)
+/// but message-based I/O (`receive_next_packet_as_message`) will be used from another.
+/// The receiving process must be the socket's controlling process to get `{active, once}` messages.
+pub fn controlling_process(
+  stream: DataStream,
+  pid: Pid,
+) -> Result(Nil, mug.Error) {
+  case stream {
+    Ssl(ssl_socket, tcp_socket) -> {
+      case tcp_controlling_process(tcp_socket, pid) {
+        Ok(_) -> ssl_controlling_process(ssl_socket, pid)
+        Error(e) -> Error(e)
+      }
+    }
+    Tcp(tcp_socket) -> tcp_controlling_process(tcp_socket, pid)
+  }
 }
 
 /// Shuts down the provided stream, whether it's an SSL or TCP stream.
