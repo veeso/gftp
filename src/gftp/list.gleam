@@ -42,10 +42,10 @@
 //// let assert Ok(files) = gleam_list.try_map(lines, list.parse_list)
 //// ```
 
+import gftp/internal/utils.{re_matches}
 import gftp/list/file.{type File}
 import gftp/list/file_type.{type FileType}
 import gftp/list/permission.{type FilePermissions, FilePermissions}
-import gftp/utils.{re_matches}
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}

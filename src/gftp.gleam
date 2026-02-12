@@ -13,7 +13,7 @@
 ////
 //// ```gleam
 //// import gftp
-//// import gftp/command/file_type
+//// import gftp/file_type
 //// import gftp/stream
 //// import gftp/result as ftp_result
 //// import gleam/bit_array
@@ -112,17 +112,17 @@
 //// for direct mapping to the FTP protocol.
 ////
 
-import gftp/command.{type Command}
-import gftp/command/feat.{type Features}
-import gftp/command/file_type
-import gftp/command/protection_level
-import gftp/listener
+import gftp/file_type
+import gftp/internal/command.{type Command}
+import gftp/internal/command/feat.{type Features}
+import gftp/internal/command/protection_level
+import gftp/internal/listener
+import gftp/internal/utils
 import gftp/mode.{type Mode}
 import gftp/response.{type Response, Response}
 import gftp/result.{type FtpResult} as ftp_result
 import gftp/status.{type Status}
 import gftp/stream.{type DataStream}
-import gftp/utils
 import gleam/bit_array
 import gleam/dict
 import gleam/int
@@ -504,7 +504,7 @@ pub fn mkd(ftp_client: FtpClient, path: String) -> FtpResult(Nil) {
 /// `file_type.Ascii(file_type.Default)` for text transfers.
 ///
 /// ```gleam
-/// import gftp/command/file_type
+/// import gftp/file_type
 ///
 /// let assert Ok(_) = gftp.transfer_type(client, file_type.Binary)
 /// ```

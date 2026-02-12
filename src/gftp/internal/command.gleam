@@ -1,7 +1,7 @@
 //// The set of FTP commands
 
-import gftp/command/file_type.{type FileType}
-import gftp/command/protection_level.{type ProtectionLevel}
+import gftp/file_type.{type FileType}
+import gftp/internal/command/protection_level.{type ProtectionLevel}
 import gleam/int
 import gleam/option.{type Option}
 

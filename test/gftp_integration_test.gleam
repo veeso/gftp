@@ -1,5 +1,5 @@
 import gftp.{type FtpClient}
-import gftp/command/file_type
+import gftp/file_type
 import gftp/response
 import gftp/result as ftp_result
 import gftp/status

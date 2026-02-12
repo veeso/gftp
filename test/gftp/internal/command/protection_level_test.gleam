@@ -1,4 +1,4 @@
-import gftp/command/protection_level.{Clear, Private}
+import gftp/internal/command/protection_level.{Clear, Private}
 
 pub fn clear_test() {
   let assert "C" = protection_level.to_string(Clear)

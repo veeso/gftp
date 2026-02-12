@@ -1,4 +1,4 @@
-import gftp/listener
+import gftp/internal/listener
 import mug
 
 pub fn listen_and_port_test() {

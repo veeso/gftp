@@ -1,5 +1,5 @@
 name = "gftp"
-version = "1.0.0"
+version = "2.0.0"
 licenses = ["MIT"]
 description = "A Gleam FTP/FTPS client library with full RFC support for both passive and active mode"
 target = "erlang"
