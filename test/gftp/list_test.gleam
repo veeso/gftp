@@ -3,6 +3,11 @@ import gftp/list/file
 import gftp/list/file_type
 import gftp/list/permission.{FilePermissions, PosixPermission}
 import gleam/option.{None, Some}
+import gleam/time/calendar
+import gleam/time/duration
+import gleam/time/timestamp
+import tempo
+import tempo/date as tempo_date
 
 // -- describe_error tests --
 
@@ -133,6 +138,58 @@ pub fn parse_list_posix_filename_with_spaces_test() {
   let line = "-rw-r--r-- 1 1000 1000 1234 Nov  5 2020 my file with spaces.txt"
   let assert Ok(f) = list.parse_list(line)
   let assert "my file with spaces.txt" = file.name(f)
+}
+
+pub fn parse_list_posix_with_adjusted_year_for_future_dates_test() {
+  let now = timestamp.system_time()
+  let #(date, _) = timestamp.to_calendar(now, duration.milliseconds(0))
+  let this_year = date.year
+
+  let month = calendar.month_to_int(date.month)
+  let new_month = month + 6
+  let assert Ok(adjusted_month) = calendar.month_from_int(new_month)
+  let new_date = calendar.Date(..date, month: adjusted_month)
+  let assert Ok(new_date) = tempo_date.from_calendar_date(new_date)
+
+  let date_fmt =
+    tempo_date.format(new_date, tempo.CustomDate("MMM D")) <> " 14:30"
+
+  let line_to_parse =
+    "-rw-r--r-- 1 1000 1000 1234 " <> date_fmt <> " future_file.txt"
+
+  let assert Ok(file) = list.parse_list(line_to_parse)
+
+  let assert Some(parsed_date) = file.modified(file)
+  let #(parsed_date, _) =
+    timestamp.to_calendar(parsed_date, duration.milliseconds(0))
+  assert this_year == parsed_date.year + 1
+  assert adjusted_month == parsed_date.month
+}
+
+pub fn parse_list_posix_should_not_adjust_year_for_near_future_dates_test() {
+  let now = timestamp.system_time()
+  let #(date, _) = timestamp.to_calendar(now, duration.milliseconds(0))
+  let this_year = date.year
+
+  let month = calendar.month_to_int(date.month)
+  let new_month = month + 2
+  let assert Ok(adjusted_month) = calendar.month_from_int(new_month)
+  let new_date = calendar.Date(..date, month: adjusted_month)
+  let assert Ok(new_date) = tempo_date.from_calendar_date(new_date)
+
+  let date_fmt =
+    tempo_date.format(new_date, tempo.CustomDate("MMM D")) <> " 14:30"
+
+  let line_to_parse =
+    "-rw-r--r-- 1 1000 1000 1234 " <> date_fmt <> " future_file.txt"
+
+  let assert Ok(file) = list.parse_list(line_to_parse)
+
+  let assert Some(parsed_date) = file.modified(file)
+  let #(parsed_date, _) =
+    timestamp.to_calendar(parsed_date, duration.milliseconds(0))
+  assert this_year == parsed_date.year
+  assert adjusted_month == parsed_date.month
 }
 
 // -- parse_list DOS format tests --

@@ -49,9 +49,11 @@ import gftp/list/permission.{type FilePermissions, FilePermissions}
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/order
 import gleam/regexp
 import gleam/result
 import gleam/string
+import gleam/time/duration
 import gleam/time/timestamp.{type Timestamp}
 import tempo
 import tempo/datetime
@@ -279,14 +281,44 @@ fn parse_list_lstime(token: String) -> Result(Timestamp, ParseError) {
     { normalized <> " 00:00" }
     |> parse_datetime_with_format("MMM D YYYY HH:mm")
 
-  // Try time format: "Nov 5 13:46" -> "1970 Nov 5 13:46" (add default year)
+  // Try time format: "Nov 5 13:46" -> "2026 Nov 5 13:46" (assume current year).
+  // If the resulting date is more than 6 months in the future, it likely refers
+  // to the previous year (matching GNU ls behavior). For example, parsing
+  // "Dec 25 14:30" in January should resolve to December of the previous year.
+  let now = timestamp.system_time()
+  let current_year =
+    now
+    |> timestamp.to_calendar(duration.seconds(0))
+    |> fn(res) { { res.0 }.year }
   let time_result =
-    { "1970 " <> normalized }
+    { int.to_string(current_year) <> " " <> normalized }
     |> parse_datetime_with_format("YYYY MMM D HH:mm")
+    |> result.try(fn(parsed) {
+      adjust_year_if_future(parsed, now, current_year, normalized)
+    })
 
   year_result
   |> result.or(time_result)
   |> result.map_error(fn(_) { InvalidDate })
+}
+
+/// If `parsed` is more than ~6 months in the future relative to `now`,
+/// re-parse using the previous year.
+fn adjust_year_if_future(
+  parsed: Timestamp,
+  now: Timestamp,
+  current_year: Int,
+  normalized: String,
+) -> Result(Timestamp, ParseError) {
+  let six_months_in_seconds = 180 * 24 * 3600
+  let diff = timestamp.difference(parsed, now)
+  case duration.compare(diff, duration.seconds(six_months_in_seconds)) {
+    order.Gt -> {
+      { int.to_string(current_year - 1) <> " " <> normalized }
+      |> parse_datetime_with_format("YYYY MMM D HH:mm")
+    }
+    _ -> Ok(parsed)
+  }
 }
 
 /// Parse the file name and symlink target (if applicable) from a POSIX LIST output line, which is typically the last token of the line.
