@@ -129,12 +129,7 @@ pub fn parse_list(line: String) -> ParseResult {
 
 /// Parse MLSD and MLST date formats, which is in the form of `%Y%m%d%H%M%S`
 fn parse_mlsd_mlst_time(date_str: String) -> Result(Timestamp, ParseError) {
-  let dateformat = tempo.CustomNaive(format: "YYYYMMDDHHmmss")
-  date_str
-  |> naive_datetime.parse(dateformat)
-  |> result.map(naive_datetime.as_utc)
-  |> result.map(datetime.to_timestamp)
-  |> result.map_error(fn(_) { InvalidDate })
+  parse_datetime_with_format(date_str, "YYYYMMDDHHmmss")
 }
 
 /// Parse the permissions string from a `MLSD` or `MLST` line, which is typically a three-digit octal number representing the permissions for the owner, group, and others in a POSIX file system. Each digit can be from 0 to 7, where the bits represent read (4), write (2), and execute (1) permissions.
@@ -280,20 +275,14 @@ fn parse_list_lstime(token: String) -> Result(Timestamp, ParseError) {
     |> normalize_whitespace()
 
   // Try year format first: "Nov 5 2020" -> "Nov 5 2020 00:00" (add default time)
-  let fmt_year = tempo.CustomNaive(format: "MMM D YYYY HH:mm")
   let year_result =
     { normalized <> " 00:00" }
-    |> naive_datetime.parse(fmt_year)
-    |> result.map(naive_datetime.as_utc)
-    |> result.map(datetime.to_timestamp)
+    |> parse_datetime_with_format("MMM D YYYY HH:mm")
 
   // Try time format: "Nov 5 13:46" -> "1970 Nov 5 13:46" (add default year)
-  let fmt_time = tempo.CustomNaive(format: "YYYY MMM D HH:mm")
   let time_result =
     { "1970 " <> normalized }
-    |> naive_datetime.parse(fmt_time)
-    |> result.map(naive_datetime.as_utc)
-    |> result.map(datetime.to_timestamp)
+    |> parse_datetime_with_format("YYYY MMM D HH:mm")
 
   year_result
   |> result.or(time_result)
@@ -400,18 +389,6 @@ fn parse_list_posix(line: String, re: regexp.Regexp) -> ParseResult {
   }
 }
 
-/// Parse a date and time in the format used by DOS LIST output, which is typically `MM-DD-YY hh:mmA` (e.g. `10-19-20 03:19PM`).
-fn parse_list_dos_time(token: String) -> Result(Timestamp, ParseError) {
-  let fmt = tempo.CustomNaive(format: "MM-DD-YY hh:mmA")
-  token
-  |> string.trim()
-  |> normalize_whitespace()
-  |> naive_datetime.parse(fmt)
-  |> result.map(naive_datetime.as_utc)
-  |> result.map(datetime.to_timestamp)
-  |> result.map_error(fn(_) { InvalidDate })
-}
-
 /// Try to parse a "LIST" output command line in DOS format.
 /// Returns [`ParseError`] if syntax is not DOS compliant.
 /// DOS syntax has the following syntax:
@@ -454,4 +431,27 @@ fn parse_list_dos(line: String, re: regexp.Regexp) -> ParseResult {
     }
     _ -> Error(SyntaxError)
   }
+}
+
+/// Parse a date and time in the format used by DOS LIST output, 
+/// which is typically `MM-DD-YY hh:mmA` (e.g. `10-19-20 03:19PM`), or with a space before the AM/PM (e.g. `10-19-20 03:19 PM`).
+fn parse_list_dos_time(token: String) -> Result(Timestamp, ParseError) {
+  token
+  |> parse_datetime_with_format("MM-DD-YY hh:mmA")
+  |> result.or(parse_datetime_with_format(token, "MM-DD-YY hh:mm A"))
+}
+
+/// Try to a string as a datetime in the provided format, returning a Timestamp on success or a ParseError on failure.
+fn parse_datetime_with_format(
+  s: String,
+  format: String,
+) -> Result(Timestamp, ParseError) {
+  let fmt = tempo.CustomNaive(format: format)
+  s
+  |> string.trim()
+  |> normalize_whitespace()
+  |> naive_datetime.parse(fmt)
+  |> result.map(naive_datetime.as_utc)
+  |> result.map(datetime.to_timestamp)
+  |> result.map_error(fn(_) { InvalidDate })
 }

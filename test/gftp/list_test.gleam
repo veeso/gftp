@@ -161,6 +161,13 @@ pub fn parse_list_dos_am_time_test() {
   let assert file_type.Directory = file.file_type(f)
 }
 
+pub fn parse_list_dos_pm_time_test_with_space() {
+  let line = "01-15-21  08:30 PM <DIR>          morning_dir"
+  let assert Ok(f) = list.parse_list(line)
+  let assert "morning_dir" = file.name(f)
+  let assert file_type.Directory = file.file_type(f)
+}
+
 // -- parse_list error tests --
 
 pub fn parse_list_empty_string_test() {
