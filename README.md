@@ -422,6 +422,14 @@ To also run active mode tests:
 GFTP_INTEGRATION_TESTS=1 GFTP_ACTIVE_MODE_TESTS=1 gleam test
 ```
 
+## git-cliff
+
+You can generate a changelog entry before a new release by running:
+
+```sh
+git cliff -u --tag vX.Y.Z
+```
+
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
