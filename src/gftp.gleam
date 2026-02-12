@@ -49,6 +49,27 @@
 //// }
 //// ```
 ////
+//// ## OTP actor (safe message-based streaming)
+////
+//// For message-based, non-blocking data transfers, use `gftp/actor` which wraps
+//// the FTP client in an OTP actor. The actor serializes all operations and
+//// rejects control commands while a data channel is open (`DataTransferInProgress`).
+////
+//// ```gleam
+//// import gftp
+//// import gftp/actor as ftp_actor
+////
+//// let assert Ok(client) = gftp.connect("ftp.example.com", 21)
+//// let assert Ok(started) = ftp_actor.start(client)
+//// let handle = started.data
+////
+//// let assert Ok(_) = ftp_actor.login(handle, "user", "password")
+//// let assert Ok(data_stream) = ftp_actor.open_retr(handle, "file.txt")
+//// // ... receive data via stream.receive_next_packet_as_message ...
+//// let assert Ok(_) = ftp_actor.close_data_channel(handle, data_stream)
+//// let assert Ok(_) = ftp_actor.quit(handle)
+//// ```
+////
 //// ## FTPS (Secure FTP)
 ////
 //// To use explicit FTPS, connect normally and then upgrade the connection:
@@ -1012,10 +1033,8 @@ fn read_response(
   read_response_in(ftp_client, [expected_status])
 }
 
-/// Key function to read a response from the server and check if it matches any of the expected status codes.
-/// 
-/// It returns error if it fails to read a response or if the response status code doesn't match any of the expected statuses.
-fn read_response_in(
+/// @internal Read a response from the server and check if it matches any of the expected status codes.
+pub fn read_response_in(
   ftp_client: FtpClient,
   expected_statuses: List(Status),
 ) -> FtpResult(Response) {
@@ -1138,10 +1157,8 @@ fn default_passive_stream_builder(
   |> result.map(fn(socket) { stream.Tcp(socket) })
 }
 
-/// Execute command which send data back in a separate stream.
-/// 
-/// On success, it returns a `DataStream` that can be used to read the data sent by the server in response to the command.
-fn data_command(
+/// @internal Execute a command that uses a separate data stream.
+pub fn data_command(
   ftp_client: FtpClient,
   command: Command,
 ) -> FtpResult(DataStream) {
@@ -1318,8 +1335,8 @@ fn build_data_channel_stream(
   }
 }
 
-/// Finalize a data command by closing the data stream and reading the final response from the server after the data transfer is complete.
-fn finalize_data_command(
+/// @internal Finalize a data command by closing the data stream and reading the server's final response.
+pub fn finalize_data_command(
   ftp_client: FtpClient,
   data_stream: DataStream,
 ) -> FtpResult(Nil) {

@@ -1,4 +1,5 @@
-import gftp/stream.{Tcp}
+import gftp/stream.{Packet, StreamClosed, Tcp}
+import gleam/erlang/process
 import mug
 
 // Opaque types for server-side sockets (gen_tcp)
@@ -155,5 +156,95 @@ pub fn local_address_tcp_test() {
 
   close_listen(listen_socket)
   let _ = stream.shutdown(Tcp(client_socket))
+  Nil
+}
+
+pub fn receive_next_packet_as_message_test() {
+  let listen_socket = listen()
+  let port = listen_port(listen_socket)
+  let client_socket = connect_client(port)
+  let server_socket = accept(listen_socket)
+
+  let data_stream = Tcp(client_socket)
+
+  // Arm the socket for one message
+  stream.receive_next_packet_as_message(data_stream)
+
+  // Build a selector
+  let selector =
+    process.new_selector()
+    |> stream.select_stream_messages(fn(msg) { msg })
+
+  // Server sends data
+  server_send(server_socket, <<"hello async":utf8>>)
+
+  // Receive via selector
+  let assert Ok(Packet(<<"hello async":utf8>>)) =
+    process.selector_receive(from: selector, within: 5000)
+
+  close_server(server_socket)
+  close_listen(listen_socket)
+  let _ = stream.shutdown(data_stream)
+  Nil
+}
+
+pub fn select_stream_messages_closed_test() {
+  let listen_socket = listen()
+  let port = listen_port(listen_socket)
+  let client_socket = connect_client(port)
+  let server_socket = accept(listen_socket)
+
+  let data_stream = Tcp(client_socket)
+
+  // Arm the socket for one message
+  stream.receive_next_packet_as_message(data_stream)
+
+  // Build a selector
+  let selector =
+    process.new_selector()
+    |> stream.select_stream_messages(fn(msg) { msg })
+
+  // Server closes the connection
+  close_server(server_socket)
+
+  // Should receive StreamClosed
+  let assert Ok(StreamClosed) =
+    process.selector_receive(from: selector, within: 5000)
+
+  close_listen(listen_socket)
+  let _ = stream.shutdown(data_stream)
+  Nil
+}
+
+type TestMessage {
+  GotStream(stream.StreamMessage)
+}
+
+pub fn select_stream_messages_mapper_test() {
+  let listen_socket = listen()
+  let port = listen_port(listen_socket)
+  let client_socket = connect_client(port)
+  let server_socket = accept(listen_socket)
+
+  let data_stream = Tcp(client_socket)
+
+  // Arm the socket for one message
+  stream.receive_next_packet_as_message(data_stream)
+
+  // Build a selector with a custom mapper
+  let selector =
+    process.new_selector()
+    |> stream.select_stream_messages(GotStream)
+
+  // Server sends data
+  server_send(server_socket, <<"mapped":utf8>>)
+
+  // Verify the mapper wraps the message correctly
+  let assert Ok(GotStream(Packet(<<"mapped":utf8>>))) =
+    process.selector_receive(from: selector, within: 5000)
+
+  close_server(server_socket)
+  close_listen(listen_socket)
+  let _ = stream.shutdown(data_stream)
   Nil
 }

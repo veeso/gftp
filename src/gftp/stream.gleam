@@ -1,6 +1,20 @@
 //// The stream module provides an interface for working with a network stream, which can either be a TCP stream or a TLS stream.
 //// It abstracts away the differences between the two types of streams and provides a unified interface for reading and writing data.
+////
+//// ## Message-based mode
+////
+//// For integration with OTP actors and other message-based architectures, the stream module provides
+//// a non-blocking alternative to synchronous `receive`. Instead of blocking the calling process,
+//// you can use `receive_next_packet_as_message` to arm the socket for a single message delivery,
+//// then use `select_stream_messages` to build a `process.Selector` that maps incoming socket
+//// messages to your actor's message type.
+////
+//// This is the standard BEAM approach: set `{active, once}` on the socket, receive one message,
+//// then re-arm. This gives backpressure control and integrates naturally with `gleam_erlang`
+//// selectors and OTP actors.
 
+import gftp/result as ftp_result
+import gleam/erlang/process.{type Pid}
 import kafein.{type WrapOptions}
 import mug
 
@@ -24,6 +38,18 @@ fn set_ssl_packet_line(socket: kafein.SslSocket) -> Nil
 @external(erlang, "stream_ffi", "set_ssl_packet_raw")
 fn set_ssl_packet_raw(socket: kafein.SslSocket) -> Nil
 
+@external(erlang, "stream_ffi", "tcp_controlling_process")
+fn tcp_controlling_process(
+  socket: mug.Socket,
+  pid: Pid,
+) -> Result(Nil, mug.Error)
+
+@external(erlang, "stream_ffi", "ssl_controlling_process")
+fn ssl_controlling_process(
+  socket: kafein.SslSocket,
+  pid: Pid,
+) -> Result(Nil, mug.Error)
+
 @external(erlang, "stream_ffi", "local_address")
 fn tcp_local_address(socket: mug.Socket) -> Result(#(String, Int), mug.Error)
 
@@ -36,6 +62,19 @@ pub type DataStream {
   /// The TCP socket is necessary in case we want to switch back to a plain TCP stream.
   Ssl(ssl: kafein.SslSocket, tcp: mug.Socket)
   Tcp(socket: mug.Socket)
+}
+
+/// A unified message type for data received asynchronously from a `DataStream`.
+///
+/// Used with `receive_next_packet_as_message` and `select_stream_messages` for
+/// non-blocking, message-based I/O that integrates with OTP actors.
+pub type StreamMessage {
+  /// Data received from the stream.
+  Packet(BitArray)
+  /// The remote peer closed the connection.
+  StreamClosed
+  /// An error occurred on the stream.
+  StreamError(ftp_result.FtpError)
 }
 
 /// Receive a message from the peer.
@@ -130,6 +169,80 @@ pub fn set_raw_mode(stream: DataStream) -> Nil {
   case stream {
     Ssl(ssl_socket, _) -> set_ssl_packet_raw(ssl_socket)
     Tcp(tcp_socket) -> set_tcp_packet_raw(tcp_socket)
+  }
+}
+
+/// Set `{active, once}` on the underlying socket so that the next packet is
+/// delivered as an Erlang message to the calling process instead of being
+/// buffered for a synchronous `receive` call.
+///
+/// After each message arrives you must call this again to receive the next one.
+/// Use `select_stream_messages` to build a selector that maps the raw socket
+/// messages into `StreamMessage` values.
+pub fn receive_next_packet_as_message(stream: DataStream) -> Nil {
+  case stream {
+    Ssl(ssl_socket, _) -> kafein.receive_next_packet_as_message(ssl_socket)
+    Tcp(tcp_socket) -> mug.receive_next_packet_as_message(tcp_socket)
+  }
+}
+
+/// Add handlers for both TCP and SSL socket messages to a `process.Selector`.
+///
+/// The `mapper` function converts a `StreamMessage` into your actor's message
+/// type. Handlers for both TCP and SSL messages are registered; only the one
+/// matching the actual socket type will ever fire.
+///
+/// ```gleam
+/// import gleam/erlang/process
+/// import gftp/stream.{type StreamMessage}
+///
+/// type MyMessage {
+///   GotStream(StreamMessage)
+///   // ... other variants
+/// }
+///
+/// let selector =
+///   process.new_selector()
+///   |> stream.select_stream_messages(GotStream)
+/// ```
+pub fn select_stream_messages(
+  selector: process.Selector(t),
+  mapper: fn(StreamMessage) -> t,
+) -> process.Selector(t) {
+  selector
+  |> mug.select_tcp_messages(fn(tcp_msg) {
+    mapper(case tcp_msg {
+      mug.Packet(_, data) -> Packet(data)
+      mug.SocketClosed(_) -> StreamClosed
+      mug.TcpError(_, err) -> StreamError(ftp_result.Socket(err))
+    })
+  })
+  |> kafein.select_ssl_messages(fn(ssl_msg) {
+    mapper(case ssl_msg {
+      kafein.Packet(_, data) -> Packet(data)
+      kafein.SocketClosed(_) -> StreamClosed
+      kafein.SslError(_, err) -> StreamError(ftp_result.Tls(err))
+    })
+  })
+}
+
+/// Transfer socket ownership to a different process.
+///
+/// This is necessary when a data stream is created in one process (e.g. an OTP actor)
+/// but message-based I/O (`receive_next_packet_as_message`) will be used from another.
+/// The receiving process must be the socket's controlling process to get `{active, once}` messages.
+pub fn controlling_process(
+  stream: DataStream,
+  pid: Pid,
+) -> Result(Nil, mug.Error) {
+  case stream {
+    Ssl(ssl_socket, tcp_socket) -> {
+      case tcp_controlling_process(tcp_socket, pid) {
+        Ok(_) -> ssl_controlling_process(ssl_socket, pid)
+        Error(e) -> Error(e)
+      }
+    }
+    Tcp(tcp_socket) -> tcp_controlling_process(tcp_socket, pid)
   }
 }
 

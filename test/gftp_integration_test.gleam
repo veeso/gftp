@@ -1,11 +1,13 @@
 import gftp.{type FtpClient}
+import gftp/actor as ftp_actor
 import gftp/file_type
 import gftp/response
 import gftp/result as ftp_result
 import gftp/status
-import gftp/stream
+import gftp/stream.{Packet}
 import gleam/bit_array
 import gleam/dict
+import gleam/erlang/process
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
@@ -538,4 +540,129 @@ pub fn ftps_stor_and_retr_test() {
     let assert Ok(_) = gftp.dele(client, "ftps_test.txt")
     Nil
   })
+}
+
+// --- Actor integration tests ---
+
+/// Run an integration test with an actor-wrapped FTP connection.
+fn with_actor_connection(callback: fn(ftp_actor.Handle) -> Nil) -> Nil {
+  case require_integration() {
+    False -> Nil
+    True -> {
+      let container_id = start_ftp_container()
+      let port = get_ftp_port(container_id)
+      let assert Ok(client) =
+        gftp.connect_timeout("127.0.0.1", port, timeout: 30_000)
+      let assert Ok(started) = ftp_actor.start(client)
+      let handle = started.data
+      let assert Ok(_) = ftp_actor.login(handle, "test", "test")
+      callback(handle)
+      let assert Ok(_) = ftp_actor.quit(handle)
+      stop_container(container_id)
+    }
+  }
+}
+
+pub fn actor_stor_and_retr_test() {
+  with_actor_connection(fn(handle) {
+    let assert Ok(_) = ftp_actor.transfer_type(handle, file_type.Binary)
+    let content = "Hello, actor!"
+    let assert Ok(_) =
+      ftp_actor.stor(handle, "actor_test.txt", fn(data_stream) {
+        stream.send(data_stream, bit_array.from_string(content))
+        |> result.map_error(ftp_result.Socket)
+      })
+    let assert Ok(_) =
+      ftp_actor.retr(handle, "actor_test.txt", fn(data_stream) {
+        let assert Ok(data) = stream.receive(data_stream, 5000)
+        let assert Ok(text) = bit_array.to_string(data)
+        let assert True = text == content
+        Ok(Nil)
+      })
+    let assert Ok(_) = ftp_actor.dele(handle, "actor_test.txt")
+    Nil
+  })
+}
+
+pub fn actor_chunk_protection_test() {
+  with_actor_connection(fn(handle) {
+    let assert Ok(_) = ftp_actor.transfer_type(handle, file_type.Binary)
+
+    // Open a data channel
+    let assert Ok(data_stream) =
+      ftp_actor.open_stor(handle, "actor_chunk_test.txt")
+
+    // Control commands should be rejected
+    let assert Error(ftp_result.DataTransferInProgress) = ftp_actor.pwd(handle)
+
+    // Write some data and close
+    let assert Ok(_) =
+      stream.send(data_stream, bit_array.from_string("chunk test"))
+    let assert Ok(_) = ftp_actor.close_data_channel(handle, data_stream)
+
+    // Control commands should work again
+    let assert Ok(_pwd) = ftp_actor.pwd(handle)
+
+    let assert Ok(_) = ftp_actor.dele(handle, "actor_chunk_test.txt")
+    Nil
+  })
+}
+
+pub fn actor_open_retr_test() {
+  with_actor_connection(fn(handle) {
+    let assert Ok(_) = ftp_actor.transfer_type(handle, file_type.Binary)
+    let content = "Hello, message-based actor retr!"
+
+    // Upload a file first
+    let assert Ok(_) =
+      ftp_actor.stor(handle, "actor_retr_test.txt", fn(ds) {
+        stream.send(ds, bit_array.from_string(content))
+        |> result.map_error(ftp_result.Socket)
+      })
+
+    // Open data channel for download
+    let assert Ok(data_stream) =
+      ftp_actor.open_retr(handle, "actor_retr_test.txt")
+
+    // Arm for message-based receive
+    stream.receive_next_packet_as_message(data_stream)
+    let selector =
+      process.new_selector()
+      |> stream.select_stream_messages(fn(msg) { msg })
+
+    // Receive data
+    let assert Ok(Packet(data)) =
+      process.selector_receive(from: selector, within: 5000)
+    let assert Ok(text) = bit_array.to_string(data)
+    let assert True = text == content
+
+    // Close
+    let assert Ok(_) = ftp_actor.close_data_channel(handle, data_stream)
+
+    let assert Ok(_) = ftp_actor.dele(handle, "actor_retr_test.txt")
+    Nil
+  })
+}
+
+pub fn actor_quit_test() {
+  case require_integration() {
+    False -> Nil
+    True -> {
+      let container_id = start_ftp_container()
+      let port = get_ftp_port(container_id)
+      let assert Ok(client) =
+        gftp.connect_timeout("127.0.0.1", port, timeout: 30_000)
+      let assert Ok(started) = ftp_actor.start(client)
+      let handle = started.data
+      let assert Ok(_) = ftp_actor.login(handle, "test", "test")
+
+      // Quit should succeed
+      let assert Ok(_) = ftp_actor.quit(handle)
+
+      // Actor process should be dead - verify by checking if the pid is alive
+      let assert False = process.is_alive(started.pid)
+
+      stop_container(container_id)
+    }
+  }
 }
