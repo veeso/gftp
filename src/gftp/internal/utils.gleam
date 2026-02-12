@@ -60,3 +60,8 @@ pub fn response_to_string(response: Response) -> FtpResult(String) {
   |> response.to_string
   |> result.map_error(fn(_) { ftp_result.BadResponse })
 }
+
+/// A helper function to check if a string is an IPv6 address by checking for the presence of a colon.
+pub fn is_ipv6_address(s: String) -> Bool {
+  string.contains(s, ":")
+}
