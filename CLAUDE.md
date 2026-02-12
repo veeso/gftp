@@ -23,12 +23,13 @@ CI runs: `gleam test` then `gleam format --check src test`.
 src/
   gftp.gleam                — Library entry point (main module)
   gftp/
+    actor.gleam              — OTP actor wrapper for safe, serialized FTP operations (public)
     file_type.gleam          — FileType and FormatControl types for the TYPE command (public)
     mode.gleam               — Mode type (Active/Passive)
     response.gleam           — FTP Response type and parsing
     result.gleam             — FtpResult type alias
     status.gleam             — FTP status codes
-    stream.gleam             — DataStream type (TCP/TLS abstraction)
+    stream.gleam             — DataStream type (TCP/TLS abstraction), StreamMessage type and message-based I/O
     stream_ffi.erl           — Erlang FFI for stream operations
     list.gleam               — FTP directory listing parsers (LIST, MLSD, MLST)
     list/
@@ -40,6 +41,7 @@ src/
       command/
         feat.gleam           — FEAT response parsing
         protection_level.gleam — ProtectionLevel type for PROT command
+      data_channel.gleam     — Open/close data channel helpers (used by actor)
       listener.gleam         — TCP listener for active mode connections
       listener_ffi.erl       — Erlang FFI for listener
       utils.gleam            — Internal utility functions
@@ -47,7 +49,9 @@ src/
 
 - **Public vs Internal:** Modules under `gftp/internal/` are implementation details not intended for direct import by library users. Public modules (`file_type`, `mode`, `response`, `result`, `status`, `stream`, `list`) form the stable API.
 - **Command encoding pattern:** Each command variant maps to its RFC wire format string via `to_string`. Sub-types (`FileType`, `ProtectionLevel`) have their own `to_string` functions in dedicated modules.
-- **Dependencies:** `mug` (TCP), `kafein` (TLS), `gleam_stdlib`. Tests use `gleeunit`.
+- **Callback vs message-based API:** Data transfer functions (`retr`, `stor`, `list`, etc.) use callbacks. For message-based I/O, use `gftp/actor` which exposes `open_*` / `close_data_channel` with chunk protection. The underlying data channel helpers live in `gftp/internal/data_channel`.
+- **Actor wrapper:** `gftp/actor` wraps `FtpClient` in an OTP actor (gen_server) that serializes all operations and rejects control commands while a data channel is open (`DataTransferInProgress`). Uses `gleam_otp`.
+- **Dependencies:** `mug` (TCP), `kafein` (TLS), `gleam_erlang` (process selectors), `gleam_otp` (actor), `gleam_stdlib`. Tests use `gleeunit`.
 - **Target:** Erlang only (`target = "erlang"` in gleam.toml).
 
 ## Conventions

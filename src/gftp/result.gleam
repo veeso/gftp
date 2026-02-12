@@ -36,6 +36,8 @@ pub type FtpError {
   Tls(kafein.Error)
   /// The address provided was invalid
   Socket(mug.Error)
+  /// A data transfer is in progress; close the data channel before issuing control commands
+  DataTransferInProgress
 }
 
 fn connection_error_to_string(e: mug.ConnectError) -> String {
@@ -70,5 +72,7 @@ pub fn describe_error(err: FtpError) -> String {
           ": cipher suite not recognized: " <> e
         kafein.TlsAlert(_, description) -> ": TLS alert: " <> description
       }
+    DataTransferInProgress ->
+      "Data transfer in progress: close the data channel before issuing control commands"
   }
 }

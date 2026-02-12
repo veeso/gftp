@@ -24,6 +24,7 @@ Based on the Rust FTP library [suppaftp](https://github.com/veeso/suppaftp).
 - File size and modification time queries
 - Server feature discovery (FEAT/OPTS, RFC 2389)
 - Custom command support for server-specific extensions
+- OTP actor wrapper for safe concurrent use and chunk protection during data transfers
 - Full RFC compliance: [959](https://tools.ietf.org/html/rfc959), [2228](https://tools.ietf.org/html/rfc2228), [4217](https://tools.ietf.org/html/rfc4217), [2428](https://tools.ietf.org/html/rfc2428), [2389](https://tools.ietf.org/html/rfc2389)
 
 ### Requirements
@@ -34,14 +35,14 @@ Based on the Rust FTP library [suppaftp](https://github.com/veeso/suppaftp).
 ## Installation
 
 ```sh
-gleam add gftp@1
+gleam add gftp@2
 ```
 
 ## Quick Start
 
 ```gleam
 import gftp
-import gftp/command/file_type
+import gftp/file_type
 import gftp/stream
 import gftp/result as ftp_result
 import gleam/bit_array
@@ -308,6 +309,79 @@ let assert Ok(_) = gftp.custom_data_command(
     Ok(Nil)
   },
 )
+```
+
+### OTP Actor
+
+The actor wrapper (`gftp/actor`) provides two benefits over using `FtpClient` directly:
+
+1. **Chunk protection** — control commands are automatically rejected with `DataTransferInProgress` while a data channel is open, preventing FTP protocol state corruption.
+2. **Message-based streaming** — open a data channel with `open_retr`, `open_stor`, etc. and receive data as messages in your OTP actor's inbox via `stream.select_stream_messages`. This lets you interleave FTP data packets with other message types (timers, other sockets, application events) using a `process.Selector`.
+
+If you only need simple callback-based transfers (like `gftp.retr`, `gftp.stor`), using `FtpClient` directly is perfectly fine.
+
+#### Basic usage
+
+```gleam
+import gftp
+import gftp/actor as ftp_actor
+import gftp/stream
+import gftp/result as ftp_result
+import gleam/bit_array
+import gleam/result
+
+// Connect and wrap in an actor
+let assert Ok(client) = gftp.connect("ftp.example.com", 21)
+let assert Ok(started) = ftp_actor.start(client)
+let handle = started.data
+
+// All operations go through the actor handle
+let assert Ok(_) = ftp_actor.login(handle, "user", "password")
+let assert Ok(cwd) = ftp_actor.pwd(handle)
+
+// Callback-based transfers work the same as with FtpClient
+let assert Ok(_) = ftp_actor.stor(handle, "hello.txt", fn(data_stream) {
+  stream.send(data_stream, bit_array.from_string("Hello, world!"))
+  |> result.map_error(ftp_result.Socket)
+})
+
+let assert Ok(_) = ftp_actor.quit(handle)
+```
+
+#### Message-based streaming with selectors
+
+Use `open_*` to get a `DataStream`, then receive packets as messages in your own actor:
+
+```gleam
+import gftp/actor as ftp_actor
+import gftp/stream.{type StreamMessage, Packet, StreamClosed, StreamError}
+import gleam/erlang/process
+
+// Open a data channel — control commands are blocked until close
+let assert Ok(data_stream) = ftp_actor.open_retr(handle, "large_file.bin")
+
+// Request the first packet to be delivered as a message
+stream.receive_next_packet_as_message(data_stream)
+
+// Build a selector that handles FTP stream messages alongside your own messages
+let selector =
+  process.new_selector()
+  |> stream.select_stream_messages(fn(msg) { msg })
+
+// Receive packets in a loop
+case process.select(selector, 30_000) {
+  Ok(Packet(data)) -> {
+    // Process chunk, then request the next one
+    stream.receive_next_packet_as_message(data_stream)
+    // ... continue selecting ...
+  }
+  Ok(StreamClosed) -> {
+    // Transfer complete — close the data channel to unblock control commands
+    let assert Ok(_) = ftp_actor.close_data_channel(handle, data_stream)
+  }
+  Ok(StreamError(err)) -> // handle error
+  Error(_) -> // timeout
+}
 ```
 
 ### Naming Convention

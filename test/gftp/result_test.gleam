@@ -84,3 +84,9 @@ pub fn describe_error_tls_alert_test() {
     ))
     |> result.describe_error
 }
+
+pub fn describe_error_data_transfer_in_progress_test() {
+  let assert "Data transfer in progress: close the data channel before issuing control commands" =
+    result.DataTransferInProgress
+    |> result.describe_error
+}
