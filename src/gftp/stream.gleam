@@ -39,7 +39,10 @@ fn set_ssl_packet_line(socket: kafein.SslSocket) -> Nil
 fn set_ssl_packet_raw(socket: kafein.SslSocket) -> Nil
 
 @external(erlang, "stream_ffi", "tcp_controlling_process")
-fn tcp_controlling_process(socket: mug.Socket, pid: Pid) -> Result(Nil, mug.Error)
+fn tcp_controlling_process(
+  socket: mug.Socket,
+  pid: Pid,
+) -> Result(Nil, mug.Error)
 
 @external(erlang, "stream_ffi", "ssl_controlling_process")
 fn ssl_controlling_process(
