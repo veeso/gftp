@@ -9,10 +9,17 @@ pub type ListenSocket {
   ListenSocket
 }
 
+/// IP address family for the listener socket.
+pub type IpFamily {
+  Ipv4
+  Ipv6
+}
+
 /// Create a TCP listener bound to an ephemeral port on all interfaces.
+/// The `ip_family` parameter determines whether to bind an IPv4 or IPv6 socket.
 /// Returns the listen socket on success.
 @external(erlang, "listener_ffi", "listen")
-pub fn listen() -> Result(ListenSocket, mug.Error)
+pub fn listen(ip_family: IpFamily) -> Result(ListenSocket, mug.Error)
 
 /// Get the port number assigned to the listen socket.
 @external(erlang, "listener_ffi", "listener_port")

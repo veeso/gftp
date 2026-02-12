@@ -1,9 +1,13 @@
 -module(listener_ffi).
 
--export([listen/0, listener_port/1, accept/2, close/1]).
+-export([listen/1, listener_port/1, accept/2, close/1]).
 
-listen() ->
-    case gen_tcp:listen(0, [binary, {active, false}, {reuseaddr, true}]) of
+listen(IpFamily) ->
+    Family = case IpFamily of
+        ipv4 -> inet;
+        ipv6 -> inet6
+    end,
+    case gen_tcp:listen(0, [binary, {active, false}, {reuseaddr, true}, Family]) of
         {ok, ListenSocket} -> {ok, ListenSocket};
         {error, Reason} -> {error, Reason}
     end.

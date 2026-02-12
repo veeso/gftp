@@ -1175,9 +1175,19 @@ fn data_command_active(
   command: Command,
   timeout: Int,
 ) -> FtpResult(DataStream) {
-  // Create a TCP listener on an ephemeral port
+  // Get the local IP of the control connection
+  use #(local_ip, _) <- result.try(
+    stream.local_address(ftp_client.data_stream)
+    |> result.map_error(ftp_result.Socket),
+  )
+  let is_ipv6 = utils.is_ipv6_address(local_ip)
+  // Create a TCP listener on an ephemeral port with the matching address family
+  let ip_family = case is_ipv6 {
+    True -> listener.Ipv6
+    False -> listener.Ipv4
+  }
   use listen_socket <- result.try(
-    listener.listen()
+    listener.listen(ip_family)
     |> result.map_error(ftp_result.Socket),
   )
   // Get the assigned port
@@ -1185,14 +1195,13 @@ fn data_command_active(
     listener.port(listen_socket)
     |> result.map_error(ftp_result.Socket),
   )
-  // Get the local IP of the control connection
-  use #(local_ip, _) <- result.try(
-    stream.local_address(ftp_client.data_stream)
-    |> result.map_error(ftp_result.Socket),
-  )
-  // Send PORT command with the local IP and port
-  let port_string = build_active_port_arg(local_ip, listen_port)
-  use _ <- result.try(perform(ftp_client, command.Port(port_string)))
+  // send PORT or EPRT command and read response
+  use _ <- result.try(send_port_command(
+    ftp_client,
+    local_ip,
+    listen_port,
+    is_ipv6,
+  ))
   use _ <- result.try(read_response(ftp_client, status.CommandOk))
   // Send the actual data command (RETR, STOR, etc.)
   use _ <- result.try(perform(ftp_client, command))
@@ -1212,6 +1221,23 @@ fn data_command_active(
       |> stream.upgrade_to_ssl(ssl_options)
       |> result.map_error(ftp_result.Tls)
     None -> Ok(data_stream)
+  }
+}
+
+/// Send the appropriate PORT or EPRT command to the server based on
+/// the IP version of the local address.
+fn send_port_command(
+  ftp_client: FtpClient,
+  local_ip: String,
+  listen_port: Int,
+  is_ipv6: Bool,
+) -> FtpResult(Nil) {
+  case is_ipv6 {
+    True -> perform(ftp_client, command.Eprt(local_ip, listen_port, command.V6))
+    False -> {
+      let port_string = build_active_port_arg(local_ip, listen_port)
+      perform(ftp_client, command.Port(port_string))
+    }
   }
 }
 
