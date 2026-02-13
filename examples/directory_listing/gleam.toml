@@ -1,0 +1,13 @@
+name = "directory_listing"
+version = "1.0.0"
+target = "erlang"
+
+[dependencies]
+gleam_stdlib = ">= 0.44.0 and < 2.0.0"
+gleam_erlang = ">= 1.3.0 and < 2.0.0"
+gleam_time = ">= 1.7.0 and < 2.0.0"
+envoy = ">= 1.0.2 and < 2.0.0"
+gftp = { path = "../../" }
+
+[dev-dependencies]
+gleeunit = ">= 1.0.0 and < 2.0.0"
