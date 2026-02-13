@@ -198,7 +198,7 @@ pub fn from_int_bad_filename_test() {
 }
 
 pub fn from_int_unknown_test() {
-  let assert Unknown = status.from_int(999)
+  let assert Unknown(999) = status.from_int(999)
 }
 
 // --- description tests ---
@@ -410,5 +410,23 @@ pub fn description_bad_filename_test() {
 }
 
 pub fn description_unknown_test() {
-  let assert "unknown error code" = status.describe(Unknown)
+  let assert "unknown error code" = status.describe(Unknown(999))
+}
+
+// --- to_int tests ---
+
+pub fn to_int_known_status_test() {
+  let assert 200 = status.to_int(CommandOk)
+}
+
+pub fn to_int_unknown_preserves_code_test() {
+  let assert 999 = status.to_int(Unknown(999))
+}
+
+pub fn to_int_roundtrip_test() {
+  let assert 226 = status.to_int(status.from_int(226))
+}
+
+pub fn to_int_unknown_roundtrip_test() {
+  let assert 777 = status.to_int(status.from_int(777))
 }
