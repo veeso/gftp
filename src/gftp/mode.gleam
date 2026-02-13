@@ -10,3 +10,9 @@ pub type Mode {
   /// Required by some servers (ipv6); defined in rfc 2428 <https://www.rfc-editor.org/rfc/rfc2428#section-3>
   ExtendedPassive
 }
+
+/// IP version for use with the EPRT command (RFC 2428).
+pub type IpVersion {
+  V4
+  V6
+}

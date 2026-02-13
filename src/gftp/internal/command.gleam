@@ -2,6 +2,7 @@
 
 import gftp/file_type.{type FileType}
 import gftp/internal/command/protection_level.{type ProtectionLevel}
+import gftp/mode.{type IpVersion, V4, V6}
 import gleam/int
 import gleam/option.{type Option}
 
@@ -83,12 +84,6 @@ pub type Command {
   User(String)
   /// Custom command
   Custom(String)
-}
-
-/// IP version; argument for `Eprt` command
-pub type IpVersion {
-  V4
-  V6
 }
 
 /// Encode the `EPRT` command with the given host, port, and IP version.

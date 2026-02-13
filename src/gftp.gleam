@@ -135,11 +135,11 @@
 
 import gftp/file_type
 import gftp/internal/command.{type Command}
-import gftp/internal/command/feat.{type Features}
+import gftp/internal/command/feat
 import gftp/internal/command/protection_level
 import gftp/internal/listener
 import gftp/internal/utils
-import gftp/mode.{type Mode}
+import gftp/mode.{type IpVersion, type Mode}
 import gftp/response.{type Response, Response}
 import gftp/result.{type FtpResult} as ftp_result
 import gftp/status.{type Status}
@@ -172,6 +172,13 @@ const epsv_port_regex = "\\(\\|\\|\\|(\\d+)\\|\\)"
 
 /// Regular expression to parse the size of the file from the response of the SIZE command.
 const size_regex = "\\s+(\\d+)\\s*$"
+
+/// The features supported by the server, as returned by the FEAT command (RFC 2389).
+///
+/// A feature has a key representing the name of the feature, and an optional value
+/// representing any parameters for that feature.
+pub type Features =
+  feat.Features
 
 /// A function that creates a new stream for the data connection in passive mode.
 ///
@@ -496,7 +503,7 @@ pub fn eprt(
   ftp_client: FtpClient,
   address: String,
   port: Int,
-  ip_version: command.IpVersion,
+  ip_version: IpVersion,
 ) -> FtpResult(Nil) {
   use _ <- result.try(perform(
     ftp_client,
@@ -1242,7 +1249,7 @@ fn send_port_command(
   is_ipv6: Bool,
 ) -> FtpResult(Nil) {
   case is_ipv6 {
-    True -> perform(ftp_client, command.Eprt(local_ip, listen_port, command.V6))
+    True -> perform(ftp_client, command.Eprt(local_ip, listen_port, mode.V6))
     False -> {
       let port_string = build_active_port_arg(local_ip, listen_port)
       perform(ftp_client, command.Port(port_string))
