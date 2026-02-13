@@ -8,9 +8,14 @@ import gleam/result
 import gleam/string
 import gleam/time/calendar
 
-/// Get the substring enclosed in the provided token.
+/// Get the substring between the first and last occurrence of the provided token.
+/// Returns `Error(Nil)` if the token is not found.
+/// With a single occurrence, returns the text after the token.
+/// With two or more occurrences, returns the text between the first and last.
 pub fn extract_str(body: String, token: String) -> Result(String, Nil) {
   case string.split(body, token) {
+    [_] -> Error(Nil)
+    [_, single] -> Ok(single)
     [_, ..rest] -> {
       rest
       |> list.take(list.length(rest) - 1)

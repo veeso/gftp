@@ -2,12 +2,12 @@ import gftp/internal/utils.{extract_str, is_ipv6_address, parse_int, parse_month
 import gftp/result as ftp_result
 import gleam/time/calendar
 
-pub fn extract_quoted_str() {
+pub fn extract_quoted_str_test() {
   let assert Ok("file.txt") =
     extract_str("The file is \"file.txt\" and it's ready for download", "\"")
 }
 
-pub fn extract_quoted_str_within_multiple_tokens() {
+pub fn extract_quoted_str_within_multiple_tokens_test() {
   let assert Ok(
     "file.txt\" and it's ready for download. Please check the \"file.txt",
   ) =
@@ -17,29 +17,29 @@ pub fn extract_quoted_str_within_multiple_tokens() {
     )
 }
 
-pub fn extract_str_with_different_token() {
+pub fn extract_str_with_different_token_test() {
   let assert Ok("file.txt> and it's ready for download") =
     extract_str("The file is <file.txt> and it's ready for download", "<")
 }
 
-pub fn extract_str_with_token_not_present() {
+pub fn extract_str_with_token_not_present_test() {
   let assert Error(Nil) =
     extract_str("The file is file.txt and it's ready for download", "\"")
 }
 
-pub fn parse_int_valid() {
+pub fn parse_int_valid_test() {
   let assert Ok(123) = parse_int("123")
 }
 
-pub fn parse_int_invalid() {
+pub fn parse_int_invalid_test() {
   let assert Error(ftp_result.BadResponse) = parse_int("abc")
 }
 
-pub fn parse_month_valid() {
+pub fn parse_month_valid_test() {
   let assert Ok(calendar.January) = parse_month("1")
 }
 
-pub fn parse_month_invalid() {
+pub fn parse_month_invalid_test() {
   let assert Error(ftp_result.BadResponse) = parse_month("13")
 }
 
