@@ -362,6 +362,9 @@ pub fn into_secure(
 ///
 /// Warning: implicit FTPS is considered deprecated. Prefer explicit mode with `into_secure` when possible.
 ///
+/// After the TLS handshake and welcome message, this function automatically sends
+/// `PBSZ 0` and `PROT P` to enable data channel protection per RFC 4217.
+///
 /// ```gleam
 /// let assert Ok(client) = gftp.connect_secure_implicit("ftp.example.com", 990, ssl_options, 30_000)
 /// let assert Ok(_) = gftp.login(client, "user", "password")
@@ -372,32 +375,38 @@ pub fn connect_secure_implicit(
   ssl_options: kafein.WrapOptions,
   timeout: Int,
 ) -> FtpResult(FtpClient) {
-  mug.ConnectionOptions(
-    host: host,
-    port: port,
-    timeout: timeout,
-    ip_version_preference: mug.Ipv6Preferred,
+  use socket <- result.try(
+    mug.ConnectionOptions(
+      host: host,
+      port: port,
+      timeout: timeout,
+      ip_version_preference: mug.Ipv6Preferred,
+    )
+    |> mug.connect()
+    |> result.map_error(ftp_result.ConnectionError),
   )
-  |> mug.connect()
-  |> result.map_error(ftp_result.ConnectionError)
-  |> result.try(fn(socket) {
-    case kafein.wrap(ssl_options, socket) {
-      Ok(ssl_socket) -> {
-        let client =
-          FtpClient(
-            data_stream: stream.Ssl(ssl: ssl_socket, tcp: socket),
-            mode: mode.Passive,
-            nat_workaround: False,
-            welcome_message: None,
-            passive_stream_builder: default_passive_stream_builder,
-            tls_options: Some(ssl_options),
-            data_timeout: default_timeout,
-          )
-        read_welcome_message(client)
-      }
-      Error(e) -> Error(ftp_result.Tls(e))
-    }
-  })
+  use ssl_socket <- result.try(
+    kafein.wrap(ssl_options, socket)
+    |> result.map_error(ftp_result.Tls),
+  )
+  let client =
+    FtpClient(
+      data_stream: stream.Ssl(ssl: ssl_socket, tcp: socket),
+      mode: mode.Passive,
+      nat_workaround: False,
+      welcome_message: None,
+      passive_stream_builder: default_passive_stream_builder,
+      tls_options: Some(ssl_options),
+      data_timeout: default_timeout,
+    )
+  use client <- result.try(read_welcome_message(client))
+  // Set protection buffer size
+  use _ <- result.try(perform(client, command.Pbsz(0)))
+  use _ <- result.try(read_response(client, status.CommandOk))
+  // Change the level of data protection to Private
+  use _ <- result.try(perform(client, command.Prot(protection_level.Private)))
+  use _ <- result.try(read_response(client, status.CommandOk))
+  Ok(client)
 }
 
 /// Get the current data stream of the FTP client. This can be either a TCP stream for plain connections or an SSL stream for secure connections.
