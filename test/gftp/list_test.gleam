@@ -315,6 +315,17 @@ pub fn parse_mlsd_with_unix_mode_644_test() {
   )) = file.permissions(f)
 }
 
+pub fn parse_mlsd_with_unix_mode_4digits_test() {
+  let line =
+    "type=file;size=100;modify=20201105134600;unix.mode=0644; readme.txt"
+  let assert Ok(f) = list.parse_mlsd(line)
+  let assert Some(FilePermissions(
+    owner: PosixPermission(read: True, write: True, execute: False),
+    group: PosixPermission(read: True, write: False, execute: False),
+    others: PosixPermission(read: True, write: False, execute: False),
+  )) = file.permissions(f)
+}
+
 pub fn parse_mlsd_unknown_keys_ignored_test() {
   let line =
     "type=file;size=100;modify=20201105134600;unknown.key=value; test.txt"

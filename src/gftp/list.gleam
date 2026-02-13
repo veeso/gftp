@@ -143,7 +143,9 @@ fn parse_mlsd_mlst_permissions(
     |> string.split("")
     |> list.map(fn(token) { token |> int.base_parse(8) |> result.unwrap(or: 0) })
   case tokens {
-    [user, group, other] ->
+    // support both three-digit (user, group, other) and four-digit (setuid/setgid/ sticky + user, group, other) formats,
+    // ignoring the setuid/setgid/sticky bits if present (e.g. `755` or `0755` both parse to the same permissions).
+    [user, group, other] | [_, user, group, other] ->
       Ok(FilePermissions(
         owner: permission.from_int(user),
         group: permission.from_int(group),
