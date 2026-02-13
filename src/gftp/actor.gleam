@@ -30,12 +30,10 @@
 //// let assert Ok(_) = ftp_actor.close_data_channel(handle, data_stream)
 //// ```
 
-import gftp.{type FtpClient, type PassiveStreamBuilder}
+import gftp.{type Features, type FtpClient, type PassiveStreamBuilder}
 import gftp/file_type
-import gftp/internal/command
-import gftp/internal/command/feat.{type Features}
 import gftp/internal/data_channel
-import gftp/mode.{type Mode}
+import gftp/mode.{type IpVersion, type Mode}
 import gftp/response.{type Response}
 import gftp/result.{type FtpResult} as ftp_result
 import gftp/status.{type Status}
@@ -94,7 +92,7 @@ pub opaque type Message {
   Eprt(
     address: String,
     port: Int,
-    ip_version: command.IpVersion,
+    ip_version: IpVersion,
     reply: Subject(FtpResult(Nil)),
   )
   CustomCommand(
@@ -344,7 +342,7 @@ pub fn eprt(
   handle: Handle,
   address: String,
   port: Int,
-  ip_version: command.IpVersion,
+  ip_version: IpVersion,
 ) -> FtpResult(Nil) {
   actor.call(handle, default_call_timeout, Eprt(address, port, ip_version, _))
 }
