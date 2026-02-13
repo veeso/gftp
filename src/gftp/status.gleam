@@ -56,7 +56,7 @@ pub type Status {
   PageTypeUnknown
   ExceededStorage
   BadFilename
-  Unknown
+  Unknown(Int)
 }
 
 /// Converts a status code to its descriptive string representation. This is useful for logging and debugging purposes.
@@ -110,7 +110,7 @@ pub fn describe(status: Status) -> String {
     ExceededStorage ->
       "requested file action aborted; exceeded storage allocation"
     BadFilename -> "requested action not taken; file name not allowed"
-    Unknown -> "unknown error code"
+    Unknown(_) -> "unknown error code"
   }
 }
 
@@ -163,6 +163,59 @@ pub fn from_int(code: Int) -> Status {
     551 -> PageTypeUnknown
     552 -> ExceededStorage
     553 -> BadFilename
-    _ -> Unknown
+    code -> Unknown(code)
+  }
+}
+
+/// Converts a `Status` variant to its corresponding integer status code.
+pub fn to_int(status: Status) -> Int {
+  case status {
+    RestartMarker -> 110
+    ReadyMinute -> 120
+    AlreadyOpen -> 125
+    AboutToSend -> 150
+    CommandOk -> 200
+    CommandNotImplemented -> 202
+    System -> 211
+    Directory -> 212
+    File -> 213
+    Help -> 214
+    Name -> 215
+    Ready -> 220
+    Closing -> 221
+    DataConnectionOpen -> 225
+    ClosingDataConnection -> 226
+    PassiveMode -> 227
+    LongPassiveMode -> 228
+    ExtendedPassiveMode -> 229
+    LoggedIn -> 230
+    LoggedOut -> 231
+    LogoutAck -> 232
+    AuthOk -> 234
+    RequestedFileActionOk -> 250
+    PathCreated -> 257
+    NeedPassword -> 331
+    LoginNeedAccount -> 332
+    RequestFilePending -> 350
+    NotAvailable -> 421
+    CannotOpenDataConnection -> 425
+    TransferAborted -> 426
+    InvalidCredentials -> 430
+    HostUnavailable -> 434
+    RequestFileActionIgnored -> 450
+    ActionAborted -> 451
+    RequestedActionNotTaken -> 452
+    BadCommand -> 500
+    BadArguments -> 501
+    NotImplemented -> 502
+    BadSequence -> 503
+    NotImplementedParameter -> 504
+    NotLoggedIn -> 530
+    StoringNeedAccount -> 532
+    FileUnavailable -> 550
+    PageTypeUnknown -> 551
+    ExceededStorage -> 552
+    BadFilename -> 553
+    Unknown(code) -> code
   }
 }
