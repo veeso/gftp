@@ -293,6 +293,16 @@ pub fn with_passive_stream_builder(
   FtpClient(..ftp_client, passive_stream_builder: builder)
 }
 
+/// Set the timeout in milliseconds for data channel operations (reads/writes on the data stream).
+/// Defaults to 30000 (30 seconds).
+///
+/// ```gleam
+/// let client = gftp.with_data_timeout(client, 60_000)
+/// ```
+pub fn with_data_timeout(ftp_client: FtpClient, timeout: Int) -> FtpClient {
+  FtpClient(..ftp_client, data_timeout: timeout)
+}
+
 /// Set the data transfer mode (Passive, ExtendedPassive, or Active).
 ///
 /// ```gleam
@@ -1058,7 +1068,10 @@ fn read_response(
   read_response_in(ftp_client, [expected_status])
 }
 
-/// @internal Read a response from the server and check if it matches any of the expected status codes.
+/// Read a response from the server and check if it matches any of the expected status codes.
+///
+/// **WARNING:** This function is intended for internal use by `gftp/actor` and
+/// `gftp/internal/data_channel`. It may change without notice in future versions.
 pub fn read_response_in(
   ftp_client: FtpClient,
   expected_statuses: List(Status),
@@ -1182,7 +1195,10 @@ fn default_passive_stream_builder(
   |> result.map(fn(socket) { stream.Tcp(socket) })
 }
 
-/// @internal Execute a command that uses a separate data stream.
+/// Execute a command that uses a separate data stream.
+///
+/// **WARNING:** This function is intended for internal use by `gftp/actor` and
+/// `gftp/internal/data_channel`. It may change without notice in future versions.
 pub fn data_command(
   ftp_client: FtpClient,
   command: Command,
@@ -1386,7 +1402,10 @@ fn build_data_channel_stream(
   }
 }
 
-/// @internal Finalize a data command by closing the data stream and reading the server's final response.
+/// Finalize a data command by closing the data stream and reading the server's final response.
+///
+/// **WARNING:** This function is intended for internal use by `gftp/actor` and
+/// `gftp/internal/data_channel`. It may change without notice in future versions.
 pub fn finalize_data_command(
   ftp_client: FtpClient,
   data_stream: DataStream,
