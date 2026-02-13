@@ -225,6 +225,15 @@ pub fn parse_list_dos_pm_time_test_with_space() {
   let assert file_type.Directory = file.file_type(f)
 }
 
+pub fn parse_list_dos_file_with_big_size_test() {
+  let line = "04-08-14  03:09PM       1,234,403      readme.txt"
+  let assert Ok(f) = list.parse_list(line)
+  let assert "readme.txt" = file.name(f)
+  let assert file_type.File = file.file_type(f)
+  let assert 1_234_403 = file.size(f)
+  let assert Some(_) = file.modified(f)
+}
+
 // -- parse_list error tests --
 
 pub fn parse_list_empty_string_test() {
