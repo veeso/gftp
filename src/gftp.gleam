@@ -6,7 +6,7 @@
 //// ## Add gftp to your project
 ////
 //// ```bash
-//// gleam add gftp@1
+//// gleam add gftp@2
 //// ```
 ////
 //// ## Quick start
