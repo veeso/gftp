@@ -41,6 +41,7 @@ import gftp/stream.{type DataStream}
 import gleam/erlang/process.{type Subject}
 import gleam/option.{type Option}
 import gleam/otp/actor
+import gleam/result
 import gleam/time/timestamp.{type Timestamp}
 import kafein
 
@@ -54,8 +55,12 @@ type State {
 }
 
 /// Handle to an FTP actor. Use the public functions in this module to interact with it.
-pub type Handle =
-  Subject(Message)
+///
+/// The handle wraps the actor subject and a configurable call timeout (default 30 seconds).
+/// Use `with_call_timeout` to adjust the timeout for all subsequent calls.
+pub opaque type Handle {
+  Handle(subject: Subject(Message), call_timeout: Int)
+}
 
 /// Internal message type for the FTP actor.
 /// Users interact via the public functions, not by sending messages directly.
@@ -192,28 +197,47 @@ pub fn start(
   |> actor.new()
   |> actor.on_message(handle_message)
   |> actor.start()
+  |> result.map(fn(started) {
+    actor.Started(
+      pid: started.pid,
+      data: Handle(subject: started.data, call_timeout: default_call_timeout),
+    )
+  })
+}
+
+/// Set the timeout in milliseconds for actor calls. Defaults to 30000 (30 seconds).
+///
+/// This timeout applies to all subsequent calls made through this handle.
+/// For large file transfers via callback-based methods (`retr`, `stor`, `appe`),
+/// consider increasing this value since the actor call blocks until the callback completes.
+///
+/// ```gleam
+/// let handle = ftp_actor.with_call_timeout(handle, 120_000)
+/// ```
+pub fn with_call_timeout(handle: Handle, timeout: Int) -> Handle {
+  Handle(..handle, call_timeout: timeout)
 }
 
 // --- Configuration (always allowed) ---
 
 /// Get the welcome message from the FTP server.
 pub fn welcome_message(handle: Handle) -> Option(String) {
-  actor.call(handle, default_call_timeout, WelcomeMessage)
+  actor.call(handle.subject, handle.call_timeout, WelcomeMessage)
 }
 
 /// Set the data transfer mode.
 pub fn with_mode(handle: Handle, mode: Mode) -> Nil {
-  actor.call(handle, default_call_timeout, WithMode(mode, _))
+  actor.call(handle.subject, handle.call_timeout, WithMode(mode, _))
 }
 
 /// Enable or disable the NAT workaround for passive mode.
 pub fn with_nat_workaround(handle: Handle, enabled: Bool) -> Nil {
-  actor.call(handle, default_call_timeout, WithNatWorkaround(enabled, _))
+  actor.call(handle.subject, handle.call_timeout, WithNatWorkaround(enabled, _))
 }
 
 /// Enable active mode with the specified data connection timeout.
 pub fn with_active_mode(handle: Handle, timeout: Int) -> Nil {
-  actor.call(handle, default_call_timeout, WithActiveMode(timeout, _))
+  actor.call(handle.subject, handle.call_timeout, WithActiveMode(timeout, _))
 }
 
 /// Set a custom passive stream builder.
@@ -221,7 +245,10 @@ pub fn with_passive_stream_builder(
   handle: Handle,
   builder: PassiveStreamBuilder,
 ) -> Nil {
-  actor.call(handle, default_call_timeout, WithPassiveStreamBuilder(builder, _))
+  actor.call(handle.subject, handle.call_timeout, WithPassiveStreamBuilder(
+    builder,
+    _,
+  ))
 }
 
 // --- Security ---
@@ -231,12 +258,12 @@ pub fn into_secure(
   handle: Handle,
   ssl_options: kafein.WrapOptions,
 ) -> FtpResult(Nil) {
-  actor.call(handle, default_call_timeout, IntoSecure(ssl_options, _))
+  actor.call(handle.subject, handle.call_timeout, IntoSecure(ssl_options, _))
 }
 
 /// Clear the command channel encryption.
 pub fn clear_command_channel(handle: Handle) -> FtpResult(Nil) {
-  actor.call(handle, default_call_timeout, ClearCommandChannel)
+  actor.call(handle.subject, handle.call_timeout, ClearCommandChannel)
 }
 
 // --- Control commands ---
@@ -247,47 +274,47 @@ pub fn login(
   username: String,
   password: String,
 ) -> FtpResult(Nil) {
-  actor.call(handle, default_call_timeout, Login(username, password, _))
+  actor.call(handle.subject, handle.call_timeout, Login(username, password, _))
 }
 
 /// Send a NOOP command.
 pub fn noop(handle: Handle) -> FtpResult(Nil) {
-  actor.call(handle, default_call_timeout, Noop)
+  actor.call(handle.subject, handle.call_timeout, Noop)
 }
 
 /// Get the current working directory.
 pub fn pwd(handle: Handle) -> FtpResult(String) {
-  actor.call(handle, default_call_timeout, Pwd)
+  actor.call(handle.subject, handle.call_timeout, Pwd)
 }
 
 /// Change working directory.
 pub fn cwd(handle: Handle, path: String) -> FtpResult(Nil) {
-  actor.call(handle, default_call_timeout, Cwd(path, _))
+  actor.call(handle.subject, handle.call_timeout, Cwd(path, _))
 }
 
 /// Change to parent directory.
 pub fn cdup(handle: Handle) -> FtpResult(Nil) {
-  actor.call(handle, default_call_timeout, Cdup)
+  actor.call(handle.subject, handle.call_timeout, Cdup)
 }
 
 /// Create a directory.
 pub fn mkd(handle: Handle, path: String) -> FtpResult(Nil) {
-  actor.call(handle, default_call_timeout, Mkd(path, _))
+  actor.call(handle.subject, handle.call_timeout, Mkd(path, _))
 }
 
 /// Remove a directory.
 pub fn rmd(handle: Handle, path: String) -> FtpResult(Nil) {
-  actor.call(handle, default_call_timeout, Rmd(path, _))
+  actor.call(handle.subject, handle.call_timeout, Rmd(path, _))
 }
 
 /// Delete a file.
 pub fn dele(handle: Handle, path: String) -> FtpResult(Nil) {
-  actor.call(handle, default_call_timeout, Dele(path, _))
+  actor.call(handle.subject, handle.call_timeout, Dele(path, _))
 }
 
 /// Rename a file.
 pub fn rename(handle: Handle, from: String, to: String) -> FtpResult(Nil) {
-  actor.call(handle, default_call_timeout, Rename(from, to, _))
+  actor.call(handle.subject, handle.call_timeout, Rename(from, to, _))
 }
 
 /// Set the file transfer type.
@@ -295,32 +322,32 @@ pub fn transfer_type(
   handle: Handle,
   file_type: file_type.FileType,
 ) -> FtpResult(Nil) {
-  actor.call(handle, default_call_timeout, TransferType(file_type, _))
+  actor.call(handle.subject, handle.call_timeout, TransferType(file_type, _))
 }
 
 /// Set the restart offset for the next transfer.
 pub fn rest(handle: Handle, offset: Int) -> FtpResult(Nil) {
-  actor.call(handle, default_call_timeout, Rest(offset, _))
+  actor.call(handle.subject, handle.call_timeout, Rest(offset, _))
 }
 
 /// Abort an active file transfer.
 pub fn abor(handle: Handle) -> FtpResult(Nil) {
-  actor.call(handle, default_call_timeout, Abor)
+  actor.call(handle.subject, handle.call_timeout, Abor)
 }
 
 /// Get the modification time of a file.
 pub fn mdtm(handle: Handle, pathname: String) -> FtpResult(Timestamp) {
-  actor.call(handle, default_call_timeout, Mdtm(pathname, _))
+  actor.call(handle.subject, handle.call_timeout, Mdtm(pathname, _))
 }
 
 /// Get the size of a file in bytes.
 pub fn size(handle: Handle, pathname: String) -> FtpResult(Int) {
-  actor.call(handle, default_call_timeout, Size(pathname, _))
+  actor.call(handle.subject, handle.call_timeout, Size(pathname, _))
 }
 
 /// Retrieve server features (FEAT command).
 pub fn feat(handle: Handle) -> FtpResult(Features) {
-  actor.call(handle, default_call_timeout, Feat)
+  actor.call(handle.subject, handle.call_timeout, Feat)
 }
 
 /// Set a server option (OPTS command).
@@ -329,12 +356,12 @@ pub fn opts(
   option: String,
   value: Option(String),
 ) -> FtpResult(Nil) {
-  actor.call(handle, default_call_timeout, Opts(option, value, _))
+  actor.call(handle.subject, handle.call_timeout, Opts(option, value, _))
 }
 
 /// Execute a SITE command.
 pub fn site(handle: Handle, sub_command: String) -> FtpResult(Response) {
-  actor.call(handle, default_call_timeout, SiteCmd(sub_command, _))
+  actor.call(handle.subject, handle.call_timeout, SiteCmd(sub_command, _))
 }
 
 /// Execute an EPRT command.
@@ -344,7 +371,12 @@ pub fn eprt(
   port: Int,
   ip_version: IpVersion,
 ) -> FtpResult(Nil) {
-  actor.call(handle, default_call_timeout, Eprt(address, port, ip_version, _))
+  actor.call(handle.subject, handle.call_timeout, Eprt(
+    address,
+    port,
+    ip_version,
+    _,
+  ))
 }
 
 /// Execute a custom FTP command.
@@ -353,7 +385,7 @@ pub fn custom_command(
   command_str: String,
   expected_statuses: List(Status),
 ) -> FtpResult(Response) {
-  actor.call(handle, default_call_timeout, CustomCommand(
+  actor.call(handle.subject, handle.call_timeout, CustomCommand(
     command_str,
     expected_statuses,
     _,
@@ -362,7 +394,7 @@ pub fn custom_command(
 
 /// Execute an MLST command.
 pub fn mlst(handle: Handle, pathname: Option(String)) -> FtpResult(String) {
-  actor.call(handle, default_call_timeout, Mlst(pathname, _))
+  actor.call(handle.subject, handle.call_timeout, Mlst(pathname, _))
 }
 
 // --- Callback-based data commands ---
@@ -373,7 +405,7 @@ pub fn retr(
   path: String,
   reader: fn(DataStream) -> FtpResult(Nil),
 ) -> FtpResult(Nil) {
-  actor.call(handle, default_call_timeout, Retr(path, reader, _))
+  actor.call(handle.subject, handle.call_timeout, Retr(path, reader, _))
 }
 
 /// Upload a file using a callback.
@@ -382,7 +414,7 @@ pub fn stor(
   path: String,
   writer: fn(DataStream) -> FtpResult(Nil),
 ) -> FtpResult(Nil) {
-  actor.call(handle, default_call_timeout, Stor(path, writer, _))
+  actor.call(handle.subject, handle.call_timeout, Stor(path, writer, _))
 }
 
 /// Append to a file using a callback.
@@ -391,22 +423,22 @@ pub fn appe(
   path: String,
   writer: fn(DataStream) -> FtpResult(Nil),
 ) -> FtpResult(Nil) {
-  actor.call(handle, default_call_timeout, Appe(path, writer, _))
+  actor.call(handle.subject, handle.call_timeout, Appe(path, writer, _))
 }
 
 /// List directory contents.
 pub fn list(handle: Handle, pathname: Option(String)) -> FtpResult(List(String)) {
-  actor.call(handle, default_call_timeout, ListDir(pathname, _))
+  actor.call(handle.subject, handle.call_timeout, ListDir(pathname, _))
 }
 
 /// List file names only.
 pub fn nlst(handle: Handle, pathname: Option(String)) -> FtpResult(List(String)) {
-  actor.call(handle, default_call_timeout, Nlst(pathname, _))
+  actor.call(handle.subject, handle.call_timeout, Nlst(pathname, _))
 }
 
 /// Machine-readable directory listing.
 pub fn mlsd(handle: Handle, pathname: Option(String)) -> FtpResult(List(String)) {
-  actor.call(handle, default_call_timeout, Mlsd(pathname, _))
+  actor.call(handle.subject, handle.call_timeout, Mlsd(pathname, _))
 }
 
 /// Execute a custom data command with a callback.
@@ -416,7 +448,7 @@ pub fn custom_data_command(
   expected_statuses: List(Status),
   on_data_stream: fn(DataStream, Response) -> FtpResult(Nil),
 ) -> FtpResult(Nil) {
-  actor.call(handle, default_call_timeout, CustomDataCommand(
+  actor.call(handle.subject, handle.call_timeout, CustomDataCommand(
     command_str,
     expected_statuses,
     on_data_stream,
@@ -432,7 +464,7 @@ pub fn custom_data_command(
 /// so message-based I/O (`receive_next_packet_as_message`) works correctly.
 pub fn open_retr(handle: Handle, path: String) -> FtpResult(DataStream) {
   let caller = process.self()
-  actor.call(handle, default_call_timeout, OpenRetr(path, caller, _))
+  actor.call(handle.subject, handle.call_timeout, OpenRetr(path, caller, _))
 }
 
 /// Open a data channel for uploading a file.
@@ -441,7 +473,7 @@ pub fn open_retr(handle: Handle, path: String) -> FtpResult(DataStream) {
 /// so message-based I/O (`receive_next_packet_as_message`) works correctly.
 pub fn open_stor(handle: Handle, path: String) -> FtpResult(DataStream) {
   let caller = process.self()
-  actor.call(handle, default_call_timeout, OpenStor(path, caller, _))
+  actor.call(handle.subject, handle.call_timeout, OpenStor(path, caller, _))
 }
 
 /// Open a data channel for appending to a file.
@@ -450,7 +482,7 @@ pub fn open_stor(handle: Handle, path: String) -> FtpResult(DataStream) {
 /// so message-based I/O (`receive_next_packet_as_message`) works correctly.
 pub fn open_appe(handle: Handle, path: String) -> FtpResult(DataStream) {
   let caller = process.self()
-  actor.call(handle, default_call_timeout, OpenAppe(path, caller, _))
+  actor.call(handle.subject, handle.call_timeout, OpenAppe(path, caller, _))
 }
 
 /// Open a data channel for a LIST directory listing.
@@ -462,7 +494,7 @@ pub fn open_list(
   pathname: Option(String),
 ) -> FtpResult(DataStream) {
   let caller = process.self()
-  actor.call(handle, default_call_timeout, OpenList(pathname, caller, _))
+  actor.call(handle.subject, handle.call_timeout, OpenList(pathname, caller, _))
 }
 
 /// Open a data channel for an NLST file name listing.
@@ -474,7 +506,7 @@ pub fn open_nlst(
   pathname: Option(String),
 ) -> FtpResult(DataStream) {
   let caller = process.self()
-  actor.call(handle, default_call_timeout, OpenNlst(pathname, caller, _))
+  actor.call(handle.subject, handle.call_timeout, OpenNlst(pathname, caller, _))
 }
 
 /// Open a data channel for an MLSD machine-readable listing.
@@ -486,7 +518,7 @@ pub fn open_mlsd(
   pathname: Option(String),
 ) -> FtpResult(DataStream) {
   let caller = process.self()
-  actor.call(handle, default_call_timeout, OpenMlsd(pathname, caller, _))
+  actor.call(handle.subject, handle.call_timeout, OpenMlsd(pathname, caller, _))
 }
 
 /// Open a data channel for a custom command.
@@ -499,7 +531,7 @@ pub fn open_data_command(
   expected_statuses: List(Status),
 ) -> FtpResult(#(DataStream, Response)) {
   let caller = process.self()
-  actor.call(handle, default_call_timeout, OpenDataCommand(
+  actor.call(handle.subject, handle.call_timeout, OpenDataCommand(
     command_str,
     expected_statuses,
     caller,
@@ -512,14 +544,17 @@ pub fn close_data_channel(
   handle: Handle,
   data_stream: DataStream,
 ) -> FtpResult(Nil) {
-  actor.call(handle, default_call_timeout, CloseDataChannel(data_stream, _))
+  actor.call(handle.subject, handle.call_timeout, CloseDataChannel(
+    data_stream,
+    _,
+  ))
 }
 
 // --- Lifecycle ---
 
 /// Quit the FTP session and stop the actor.
 pub fn quit(handle: Handle) -> FtpResult(Nil) {
-  actor.call(handle, default_call_timeout, Quit)
+  actor.call(handle.subject, handle.call_timeout, Quit)
 }
 
 // ---------------------------------------------------------------------------
