@@ -627,13 +627,22 @@ pub fn rest(ftp_client: FtpClient, offset: Int) -> FtpResult(Nil) {
 /// from within the reader or writer function passed to `retr`, `stor` or `appe`, otherwise it may put the client in an inconsistent state.
 pub fn abor(ftp_client: FtpClient) -> FtpResult(Nil) {
   use _ <- result.try(perform(ftp_client, command.Abor))
-
-  ftp_client
-  |> read_response_in([
-    status.TransferAborted,
-    status.ClosingDataConnection,
-  ])
-  |> result.replace(Nil)
+  use response <- result.try(
+    read_response_in(ftp_client, [
+      status.TransferAborted,
+      status.ClosingDataConnection,
+    ]),
+  )
+  // if the server responds with TransferAborted, we need to read the next response with ClosingDataConnection
+  // to complete the abort sequence and close the data connection properly
+  case response.code {
+    status.TransferAborted -> {
+      ftp_client
+      |> read_response(status.ClosingDataConnection)
+      |> result.replace(Nil)
+    }
+    _ -> Ok(Nil)
+  }
 }
 
 /// Download a file from the FTP server.
