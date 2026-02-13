@@ -399,6 +399,36 @@ Function names follow FTP command names for familiarity with the protocol:
 
 Full API documentation is available at <https://hexdocs.pm/gftp>.
 
+## Examples
+
+The [`examples/`](examples/) directory contains standalone Gleam projects demonstrating common gftp usage patterns. Each example can be run with `gleam run` after setting the FTP connection environment variables.
+
+| Example | Description |
+|---------|-------------|
+| [`simple_client`](examples/simple_client/) | Direct `FtpClient` API: connect, login, list, upload, download, delete |
+| [`actor_client`](examples/actor_client/) | OTP actor wrapper with message-based streaming and chunk protection |
+| [`directory_listing`](examples/directory_listing/) | Parse LIST/MLSD output into structured `File` records with metadata |
+
+To quickly spin up a local FTP server using Docker:
+
+```sh
+docker run -d --name gftp-test-ftp \
+  -e "USERS=test|test|/home/test" \
+  -e ADDRESS=127.0.0.1 \
+  -e MIN_PORT=21100 \
+  -e MAX_PORT=21110 \
+  -p 2121:21 \
+  -p 21100-21110:21100-21110 \
+  delfer/alpine-ftp-server:latest
+```
+
+Then run any example:
+
+```sh
+cd examples/simple_client
+FTP_HOST=127.0.0.1 FTP_PORT=2121 FTP_USER=test FTP_PASSWORD=test gleam run
+```
+
 ## Development
 
 ```sh

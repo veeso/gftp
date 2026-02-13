@@ -23,3 +23,15 @@ jobs:
           GFTP_INTEGRATION_TESTS: 1
           GFTP_ACTIVE_MODE_TESTS: 1
       - run: gleam format --check src test
+      - name: Build examples
+        run: |
+          for example in ./examples/*; do
+            if [ -d "$example" ]; then
+              echo "Building example: $example"
+              cd "$example"
+              gleam deps download
+              gleam build
+              gleam format --check src
+              cd -
+            fi
+          done
