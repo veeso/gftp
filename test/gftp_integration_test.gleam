@@ -13,6 +13,10 @@ import gleam/option.{None, Some}
 import gleam/result
 import gleam/string
 import kafein
+import mug
+import testcontainers_gleam
+import testcontainers_gleam/container.{type Container}
+import testcontainers_gleam/wait_strategy
 
 @external(erlang, "stream_test_ffi", "get_env")
 fn get_env(name: String) -> Result(String, Nil)
@@ -62,16 +66,45 @@ fn with_ftp_connection(callback: fn(FtpClient) -> Nil) -> Nil {
       Nil
     }
     True -> {
-      let container_id = start_ftp_container()
-      let port = get_ftp_port(container_id)
+      let container = alpine_ftp_container()
+      let assert Ok(container) = testcontainers_gleam.start_container(container)
+      let container_id = container.container_id(container)
+
+      let assert Ok(port) = container.mapped_port(container, 21)
       let assert Ok(client) =
         gftp.connect_timeout("127.0.0.1", port, timeout: 30_000)
+
+      let client =
+        gftp.with_passive_stream_builder(client, fn(host, port) {
+          // get mapped port for data
+          let assert Ok(data_port) = container.mapped_port(container, port)
+
+          mug.new(host, data_port)
+          |> mug.connect()
+          |> result.map_error(ftp_result.ConnectionError)
+          |> result.map(stream.Tcp)
+        })
+
       let assert Ok(_) = gftp.login(client, "test", "test")
       callback(client)
       let assert Ok(_) = gftp.quit(client)
-      stop_container(container_id)
+      let assert Ok(_) = testcontainers_gleam.stop_container(container_id)
+      Nil
     }
   }
+}
+
+fn alpine_ftp_container() -> Container {
+  "delfer/alpine-ftp-server:latest"
+  |> container.new()
+  |> container.with_exposed_port(21)
+  |> container.with_exposed_ports(list.range(21_100, 21_110))
+  |> container.with_environment("MIN_PORT", "21100")
+  |> container.with_environment("MAX_PORT", "21110")
+  |> container.with_environment("USERS", "test|test|/home/test")
+  |> container.with_environment("ADDRESS", "127.0.0.1")
+  |> container.with_waiting_strategy(wait_strategy.log("passwd:", 30_000, 500))
+  |> container.with_auto_remove(True)
 }
 
 // --- Connection and auth tests ---
