@@ -128,20 +128,8 @@ fn with_ftp_active_connection(callback: fn(FtpClient) -> Nil) -> Nil {
       let assert Ok(container) = testcontainers_gleam.start_container(container)
       let container_id = container.container_id(container)
 
-      let assert Ok(port) = container.mapped_port(container, 21)
       let assert Ok(client) =
-        gftp.connect_timeout("127.0.0.1", port, timeout: 30_000)
-
-      let client =
-        gftp.with_passive_stream_builder(client, fn(host, port) {
-          // get mapped port for data
-          let assert Ok(data_port) = container.mapped_port(container, port)
-
-          mug.new(host, data_port)
-          |> mug.connect()
-          |> result.map_error(ftp_result.ConnectionError)
-          |> result.map(stream.Tcp)
-        })
+        gftp.connect_timeout("127.0.0.1", 21, timeout: 30_000)
 
       let assert Ok(_) = gftp.login(client, "test", "test")
       callback(client)
@@ -164,13 +152,24 @@ fn with_actor_connection(callback: fn(ftp_actor.Handle) -> Nil) -> Nil {
       // Set up TLS inside the running container (install certs, start vsftpd on port 990)
       setup_ftps(container_id)
 
+      let assert Ok(port) = container.mapped_port(container, 990)
       let ssl_options =
         kafein.default_options
         |> kafein.verify(kafein.VerifyNone)
       let assert Ok(client) =
-        gftp.connect_timeout("127.0.0.1", 21, timeout: 30_000)
+        gftp.connect_timeout("127.0.0.1", port, timeout: 30_000)
         |> result.try(fn(client) { gftp.into_secure(client, ssl_options) })
 
+      let client =
+        gftp.with_passive_stream_builder(client, fn(host, port) {
+          // get mapped port for data
+          let assert Ok(data_port) = container.mapped_port(container, port)
+
+          mug.new(host, data_port)
+          |> mug.connect()
+          |> result.map_error(ftp_result.ConnectionError)
+          |> result.map(stream.Tcp)
+        })
       let assert Ok(started) = ftp_actor.start(client)
       let handle = started.data
       let assert Ok(_) = ftp_actor.login(handle, "test", "test")
