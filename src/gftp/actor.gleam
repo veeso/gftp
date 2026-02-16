@@ -30,14 +30,15 @@
 //// let assert Ok(_) = ftp_actor.close_data_channel(handle, data_stream)
 //// ```
 
-import gftp.{type Features, type FtpClient, type PassiveStreamBuilder}
+import gftp.{type FtpClient, type PassiveStreamBuilder}
 import gftp/file_type
 import gftp/internal/data_channel
 import gftp/mode.{type IpVersion, type Mode}
 import gftp/response.{type Response}
-import gftp/result.{type FtpResult} as ftp_result
+import gftp/result.{type FtpError} as ftp_result
 import gftp/status.{type Status}
 import gftp/stream.{type DataStream}
+import gleam/dict
 import gleam/erlang/process.{type Subject}
 import gleam/option.{type Option}
 import gleam/otp/actor
@@ -73,109 +74,129 @@ pub opaque type Message {
   WithPassiveStreamBuilder(builder: PassiveStreamBuilder, reply: Subject(Nil))
 
   // --- Security (chunk guard, updates client) ---
-  IntoSecure(ssl_options: kafein.WrapOptions, reply: Subject(FtpResult(Nil)))
-  ClearCommandChannel(reply: Subject(FtpResult(Nil)))
+  IntoSecure(
+    ssl_options: kafein.WrapOptions,
+    reply: Subject(Result(Nil, FtpError)),
+  )
+  ClearCommandChannel(reply: Subject(Result(Nil, FtpError)))
 
   // --- Control commands (chunk guard) ---
-  Login(username: String, password: String, reply: Subject(FtpResult(Nil)))
-  Noop(reply: Subject(FtpResult(Nil)))
-  Pwd(reply: Subject(FtpResult(String)))
-  Cwd(path: String, reply: Subject(FtpResult(Nil)))
-  Cdup(reply: Subject(FtpResult(Nil)))
-  Mkd(path: String, reply: Subject(FtpResult(Nil)))
-  Rmd(path: String, reply: Subject(FtpResult(Nil)))
-  Dele(path: String, reply: Subject(FtpResult(Nil)))
-  Rename(from: String, to: String, reply: Subject(FtpResult(Nil)))
-  TransferType(file_type: file_type.FileType, reply: Subject(FtpResult(Nil)))
-  Rest(offset: Int, reply: Subject(FtpResult(Nil)))
-  Abor(reply: Subject(FtpResult(Nil)))
-  Mdtm(pathname: String, reply: Subject(FtpResult(Timestamp)))
-  Size(pathname: String, reply: Subject(FtpResult(Int)))
-  Feat(reply: Subject(FtpResult(Features)))
-  Opts(option: String, value: Option(String), reply: Subject(FtpResult(Nil)))
-  SiteCmd(sub_command: String, reply: Subject(FtpResult(Response)))
+  Login(
+    username: String,
+    password: String,
+    reply: Subject(Result(Nil, FtpError)),
+  )
+  Noop(reply: Subject(Result(Nil, FtpError)))
+  Pwd(reply: Subject(Result(String, FtpError)))
+  Cwd(path: String, reply: Subject(Result(Nil, FtpError)))
+  Cdup(reply: Subject(Result(Nil, FtpError)))
+  Mkd(path: String, reply: Subject(Result(Nil, FtpError)))
+  Rmd(path: String, reply: Subject(Result(Nil, FtpError)))
+  Dele(path: String, reply: Subject(Result(Nil, FtpError)))
+  Rename(from: String, to: String, reply: Subject(Result(Nil, FtpError)))
+  TransferType(
+    file_type: file_type.FileType,
+    reply: Subject(Result(Nil, FtpError)),
+  )
+  Rest(offset: Int, reply: Subject(Result(Nil, FtpError)))
+  Abor(reply: Subject(Result(Nil, FtpError)))
+  Mdtm(pathname: String, reply: Subject(Result(Timestamp, FtpError)))
+  Size(pathname: String, reply: Subject(Result(Int, FtpError)))
+  Feat(reply: Subject(Result(dict.Dict(String, Option(String)), FtpError)))
+  Opts(
+    option: String,
+    value: Option(String),
+    reply: Subject(Result(Nil, FtpError)),
+  )
+  SiteCmd(sub_command: String, reply: Subject(Result(Response, FtpError)))
   Eprt(
     address: String,
     port: Int,
     ip_version: IpVersion,
-    reply: Subject(FtpResult(Nil)),
+    reply: Subject(Result(Nil, FtpError)),
   )
   CustomCommand(
     command_str: String,
     expected_statuses: List(Status),
-    reply: Subject(FtpResult(Response)),
+    reply: Subject(Result(Response, FtpError)),
   )
-  Mlst(pathname: Option(String), reply: Subject(FtpResult(String)))
+  Mlst(pathname: Option(String), reply: Subject(Result(String, FtpError)))
 
   // --- Callback-based data commands (chunk guard, blocks actor during execution) ---
   Retr(
     path: String,
-    reader: fn(DataStream) -> FtpResult(Nil),
-    reply: Subject(FtpResult(Nil)),
+    reader: fn(DataStream) -> Result(Nil, FtpError),
+    reply: Subject(Result(Nil, FtpError)),
   )
   Stor(
     path: String,
-    writer: fn(DataStream) -> FtpResult(Nil),
-    reply: Subject(FtpResult(Nil)),
+    writer: fn(DataStream) -> Result(Nil, FtpError),
+    reply: Subject(Result(Nil, FtpError)),
   )
   Appe(
     path: String,
-    writer: fn(DataStream) -> FtpResult(Nil),
-    reply: Subject(FtpResult(Nil)),
+    writer: fn(DataStream) -> Result(Nil, FtpError),
+    reply: Subject(Result(Nil, FtpError)),
   )
-  ListDir(pathname: Option(String), reply: Subject(FtpResult(List(String))))
-  Nlst(pathname: Option(String), reply: Subject(FtpResult(List(String))))
-  Mlsd(pathname: Option(String), reply: Subject(FtpResult(List(String))))
+  ListDir(
+    pathname: Option(String),
+    reply: Subject(Result(List(String), FtpError)),
+  )
+  Nlst(pathname: Option(String), reply: Subject(Result(List(String), FtpError)))
+  Mlsd(pathname: Option(String), reply: Subject(Result(List(String), FtpError)))
   CustomDataCommand(
     command_str: String,
     expected_statuses: List(Status),
-    on_data_stream: fn(DataStream, Response) -> FtpResult(Nil),
-    reply: Subject(FtpResult(Nil)),
+    on_data_stream: fn(DataStream, Response) -> Result(Nil, FtpError),
+    reply: Subject(Result(Nil, FtpError)),
   )
 
   // --- Open data channel (chunk guard, sets chunk=True) ---
   OpenRetr(
     path: String,
     caller: process.Pid,
-    reply: Subject(FtpResult(DataStream)),
+    reply: Subject(Result(DataStream, FtpError)),
   )
   OpenStor(
     path: String,
     caller: process.Pid,
-    reply: Subject(FtpResult(DataStream)),
+    reply: Subject(Result(DataStream, FtpError)),
   )
   OpenAppe(
     path: String,
     caller: process.Pid,
-    reply: Subject(FtpResult(DataStream)),
+    reply: Subject(Result(DataStream, FtpError)),
   )
   OpenList(
     pathname: Option(String),
     caller: process.Pid,
-    reply: Subject(FtpResult(DataStream)),
+    reply: Subject(Result(DataStream, FtpError)),
   )
   OpenNlst(
     pathname: Option(String),
     caller: process.Pid,
-    reply: Subject(FtpResult(DataStream)),
+    reply: Subject(Result(DataStream, FtpError)),
   )
   OpenMlsd(
     pathname: Option(String),
     caller: process.Pid,
-    reply: Subject(FtpResult(DataStream)),
+    reply: Subject(Result(DataStream, FtpError)),
   )
   OpenDataCommand(
     command_str: String,
     expected_statuses: List(Status),
     caller: process.Pid,
-    reply: Subject(FtpResult(#(DataStream, Response))),
+    reply: Subject(Result(#(DataStream, Response), FtpError)),
   )
 
   // --- Close data channel (resets chunk=False) ---
-  CloseDataChannel(data_stream: DataStream, reply: Subject(FtpResult(Nil)))
+  CloseDataChannel(
+    data_stream: DataStream,
+    reply: Subject(Result(Nil, FtpError)),
+  )
 
   // --- Lifecycle ---
-  Quit(reply: Subject(FtpResult(Nil)))
+  Quit(reply: Subject(Result(Nil, FtpError)))
 }
 
 // ---------------------------------------------------------------------------
@@ -257,12 +278,12 @@ pub fn with_passive_stream_builder(
 pub fn into_secure(
   handle: Handle,
   ssl_options: kafein.WrapOptions,
-) -> FtpResult(Nil) {
+) -> Result(Nil, FtpError) {
   actor.call(handle.subject, handle.call_timeout, IntoSecure(ssl_options, _))
 }
 
 /// Clear the command channel encryption.
-pub fn clear_command_channel(handle: Handle) -> FtpResult(Nil) {
+pub fn clear_command_channel(handle: Handle) -> Result(Nil, FtpError) {
   actor.call(handle.subject, handle.call_timeout, ClearCommandChannel)
 }
 
@@ -273,47 +294,47 @@ pub fn login(
   handle: Handle,
   username: String,
   password: String,
-) -> FtpResult(Nil) {
+) -> Result(Nil, FtpError) {
   actor.call(handle.subject, handle.call_timeout, Login(username, password, _))
 }
 
 /// Send a NOOP command.
-pub fn noop(handle: Handle) -> FtpResult(Nil) {
+pub fn noop(handle: Handle) -> Result(Nil, FtpError) {
   actor.call(handle.subject, handle.call_timeout, Noop)
 }
 
 /// Get the current working directory.
-pub fn pwd(handle: Handle) -> FtpResult(String) {
+pub fn pwd(handle: Handle) -> Result(String, FtpError) {
   actor.call(handle.subject, handle.call_timeout, Pwd)
 }
 
 /// Change working directory.
-pub fn cwd(handle: Handle, path: String) -> FtpResult(Nil) {
+pub fn cwd(handle: Handle, path: String) -> Result(Nil, FtpError) {
   actor.call(handle.subject, handle.call_timeout, Cwd(path, _))
 }
 
 /// Change to parent directory.
-pub fn cdup(handle: Handle) -> FtpResult(Nil) {
+pub fn cdup(handle: Handle) -> Result(Nil, FtpError) {
   actor.call(handle.subject, handle.call_timeout, Cdup)
 }
 
 /// Create a directory.
-pub fn mkd(handle: Handle, path: String) -> FtpResult(Nil) {
+pub fn mkd(handle: Handle, path: String) -> Result(Nil, FtpError) {
   actor.call(handle.subject, handle.call_timeout, Mkd(path, _))
 }
 
 /// Remove a directory.
-pub fn rmd(handle: Handle, path: String) -> FtpResult(Nil) {
+pub fn rmd(handle: Handle, path: String) -> Result(Nil, FtpError) {
   actor.call(handle.subject, handle.call_timeout, Rmd(path, _))
 }
 
 /// Delete a file.
-pub fn dele(handle: Handle, path: String) -> FtpResult(Nil) {
+pub fn dele(handle: Handle, path: String) -> Result(Nil, FtpError) {
   actor.call(handle.subject, handle.call_timeout, Dele(path, _))
 }
 
 /// Rename a file.
-pub fn rename(handle: Handle, from: String, to: String) -> FtpResult(Nil) {
+pub fn rename(handle: Handle, from: String, to: String) -> Result(Nil, FtpError) {
   actor.call(handle.subject, handle.call_timeout, Rename(from, to, _))
 }
 
@@ -321,32 +342,34 @@ pub fn rename(handle: Handle, from: String, to: String) -> FtpResult(Nil) {
 pub fn transfer_type(
   handle: Handle,
   file_type: file_type.FileType,
-) -> FtpResult(Nil) {
+) -> Result(Nil, FtpError) {
   actor.call(handle.subject, handle.call_timeout, TransferType(file_type, _))
 }
 
 /// Set the restart offset for the next transfer.
-pub fn rest(handle: Handle, offset: Int) -> FtpResult(Nil) {
+pub fn rest(handle: Handle, offset: Int) -> Result(Nil, FtpError) {
   actor.call(handle.subject, handle.call_timeout, Rest(offset, _))
 }
 
 /// Abort an active file transfer.
-pub fn abor(handle: Handle) -> FtpResult(Nil) {
+pub fn abor(handle: Handle) -> Result(Nil, FtpError) {
   actor.call(handle.subject, handle.call_timeout, Abor)
 }
 
 /// Get the modification time of a file.
-pub fn mdtm(handle: Handle, pathname: String) -> FtpResult(Timestamp) {
+pub fn mdtm(handle: Handle, pathname: String) -> Result(Timestamp, FtpError) {
   actor.call(handle.subject, handle.call_timeout, Mdtm(pathname, _))
 }
 
 /// Get the size of a file in bytes.
-pub fn size(handle: Handle, pathname: String) -> FtpResult(Int) {
+pub fn size(handle: Handle, pathname: String) -> Result(Int, FtpError) {
   actor.call(handle.subject, handle.call_timeout, Size(pathname, _))
 }
 
 /// Retrieve server features (FEAT command).
-pub fn feat(handle: Handle) -> FtpResult(Features) {
+pub fn feat(
+  handle: Handle,
+) -> Result(dict.Dict(String, Option(String)), FtpError) {
   actor.call(handle.subject, handle.call_timeout, Feat)
 }
 
@@ -355,12 +378,12 @@ pub fn opts(
   handle: Handle,
   option: String,
   value: Option(String),
-) -> FtpResult(Nil) {
+) -> Result(Nil, FtpError) {
   actor.call(handle.subject, handle.call_timeout, Opts(option, value, _))
 }
 
 /// Execute a SITE command.
-pub fn site(handle: Handle, sub_command: String) -> FtpResult(Response) {
+pub fn site(handle: Handle, sub_command: String) -> Result(Response, FtpError) {
   actor.call(handle.subject, handle.call_timeout, SiteCmd(sub_command, _))
 }
 
@@ -370,7 +393,7 @@ pub fn eprt(
   address: String,
   port: Int,
   ip_version: IpVersion,
-) -> FtpResult(Nil) {
+) -> Result(Nil, FtpError) {
   actor.call(handle.subject, handle.call_timeout, Eprt(
     address,
     port,
@@ -384,7 +407,7 @@ pub fn custom_command(
   handle: Handle,
   command_str: String,
   expected_statuses: List(Status),
-) -> FtpResult(Response) {
+) -> Result(Response, FtpError) {
   actor.call(handle.subject, handle.call_timeout, CustomCommand(
     command_str,
     expected_statuses,
@@ -393,7 +416,10 @@ pub fn custom_command(
 }
 
 /// Execute an MLST command.
-pub fn mlst(handle: Handle, pathname: Option(String)) -> FtpResult(String) {
+pub fn mlst(
+  handle: Handle,
+  pathname: Option(String),
+) -> Result(String, FtpError) {
   actor.call(handle.subject, handle.call_timeout, Mlst(pathname, _))
 }
 
@@ -403,8 +429,8 @@ pub fn mlst(handle: Handle, pathname: Option(String)) -> FtpResult(String) {
 pub fn retr(
   handle: Handle,
   path: String,
-  reader: fn(DataStream) -> FtpResult(Nil),
-) -> FtpResult(Nil) {
+  reader: fn(DataStream) -> Result(Nil, FtpError),
+) -> Result(Nil, FtpError) {
   actor.call(handle.subject, handle.call_timeout, Retr(path, reader, _))
 }
 
@@ -412,8 +438,8 @@ pub fn retr(
 pub fn stor(
   handle: Handle,
   path: String,
-  writer: fn(DataStream) -> FtpResult(Nil),
-) -> FtpResult(Nil) {
+  writer: fn(DataStream) -> Result(Nil, FtpError),
+) -> Result(Nil, FtpError) {
   actor.call(handle.subject, handle.call_timeout, Stor(path, writer, _))
 }
 
@@ -421,23 +447,32 @@ pub fn stor(
 pub fn appe(
   handle: Handle,
   path: String,
-  writer: fn(DataStream) -> FtpResult(Nil),
-) -> FtpResult(Nil) {
+  writer: fn(DataStream) -> Result(Nil, FtpError),
+) -> Result(Nil, FtpError) {
   actor.call(handle.subject, handle.call_timeout, Appe(path, writer, _))
 }
 
 /// List directory contents.
-pub fn list(handle: Handle, pathname: Option(String)) -> FtpResult(List(String)) {
+pub fn list(
+  handle: Handle,
+  pathname: Option(String),
+) -> Result(List(String), FtpError) {
   actor.call(handle.subject, handle.call_timeout, ListDir(pathname, _))
 }
 
 /// List file names only.
-pub fn nlst(handle: Handle, pathname: Option(String)) -> FtpResult(List(String)) {
+pub fn nlst(
+  handle: Handle,
+  pathname: Option(String),
+) -> Result(List(String), FtpError) {
   actor.call(handle.subject, handle.call_timeout, Nlst(pathname, _))
 }
 
 /// Machine-readable directory listing.
-pub fn mlsd(handle: Handle, pathname: Option(String)) -> FtpResult(List(String)) {
+pub fn mlsd(
+  handle: Handle,
+  pathname: Option(String),
+) -> Result(List(String), FtpError) {
   actor.call(handle.subject, handle.call_timeout, Mlsd(pathname, _))
 }
 
@@ -446,8 +481,8 @@ pub fn custom_data_command(
   handle: Handle,
   command_str: String,
   expected_statuses: List(Status),
-  on_data_stream: fn(DataStream, Response) -> FtpResult(Nil),
-) -> FtpResult(Nil) {
+  on_data_stream: fn(DataStream, Response) -> Result(Nil, FtpError),
+) -> Result(Nil, FtpError) {
   actor.call(handle.subject, handle.call_timeout, CustomDataCommand(
     command_str,
     expected_statuses,
@@ -462,7 +497,7 @@ pub fn custom_data_command(
 ///
 /// The returned `DataStream` has its controlling process set to the caller,
 /// so message-based I/O (`receive_next_packet_as_message`) works correctly.
-pub fn open_retr(handle: Handle, path: String) -> FtpResult(DataStream) {
+pub fn open_retr(handle: Handle, path: String) -> Result(DataStream, FtpError) {
   let caller = process.self()
   actor.call(handle.subject, handle.call_timeout, OpenRetr(path, caller, _))
 }
@@ -471,7 +506,7 @@ pub fn open_retr(handle: Handle, path: String) -> FtpResult(DataStream) {
 ///
 /// The returned `DataStream` has its controlling process set to the caller,
 /// so message-based I/O (`receive_next_packet_as_message`) works correctly.
-pub fn open_stor(handle: Handle, path: String) -> FtpResult(DataStream) {
+pub fn open_stor(handle: Handle, path: String) -> Result(DataStream, FtpError) {
   let caller = process.self()
   actor.call(handle.subject, handle.call_timeout, OpenStor(path, caller, _))
 }
@@ -480,7 +515,7 @@ pub fn open_stor(handle: Handle, path: String) -> FtpResult(DataStream) {
 ///
 /// The returned `DataStream` has its controlling process set to the caller,
 /// so message-based I/O (`receive_next_packet_as_message`) works correctly.
-pub fn open_appe(handle: Handle, path: String) -> FtpResult(DataStream) {
+pub fn open_appe(handle: Handle, path: String) -> Result(DataStream, FtpError) {
   let caller = process.self()
   actor.call(handle.subject, handle.call_timeout, OpenAppe(path, caller, _))
 }
@@ -492,7 +527,7 @@ pub fn open_appe(handle: Handle, path: String) -> FtpResult(DataStream) {
 pub fn open_list(
   handle: Handle,
   pathname: Option(String),
-) -> FtpResult(DataStream) {
+) -> Result(DataStream, FtpError) {
   let caller = process.self()
   actor.call(handle.subject, handle.call_timeout, OpenList(pathname, caller, _))
 }
@@ -504,7 +539,7 @@ pub fn open_list(
 pub fn open_nlst(
   handle: Handle,
   pathname: Option(String),
-) -> FtpResult(DataStream) {
+) -> Result(DataStream, FtpError) {
   let caller = process.self()
   actor.call(handle.subject, handle.call_timeout, OpenNlst(pathname, caller, _))
 }
@@ -516,7 +551,7 @@ pub fn open_nlst(
 pub fn open_mlsd(
   handle: Handle,
   pathname: Option(String),
-) -> FtpResult(DataStream) {
+) -> Result(DataStream, FtpError) {
   let caller = process.self()
   actor.call(handle.subject, handle.call_timeout, OpenMlsd(pathname, caller, _))
 }
@@ -529,7 +564,7 @@ pub fn open_data_command(
   handle: Handle,
   command_str: String,
   expected_statuses: List(Status),
-) -> FtpResult(#(DataStream, Response)) {
+) -> Result(#(DataStream, Response), FtpError) {
   let caller = process.self()
   actor.call(handle.subject, handle.call_timeout, OpenDataCommand(
     command_str,
@@ -543,7 +578,7 @@ pub fn open_data_command(
 pub fn close_data_channel(
   handle: Handle,
   data_stream: DataStream,
-) -> FtpResult(Nil) {
+) -> Result(Nil, FtpError) {
   actor.call(handle.subject, handle.call_timeout, CloseDataChannel(
     data_stream,
     _,
@@ -553,7 +588,7 @@ pub fn close_data_channel(
 // --- Lifecycle ---
 
 /// Quit the FTP session and stop the actor.
-pub fn quit(handle: Handle) -> FtpResult(Nil) {
+pub fn quit(handle: Handle) -> Result(Nil, FtpError) {
   actor.call(handle.subject, handle.call_timeout, Quit)
 }
 
@@ -744,8 +779,8 @@ fn handle_message(state: State, message: Message) -> actor.Next(State, Message) 
 /// Otherwise, runs the operation and continues with the (possibly updated) state.
 fn guard_chunk(
   state: State,
-  reply: Subject(FtpResult(a)),
-  operation: fn(State) -> #(State, FtpResult(a)),
+  reply: Subject(Result(a, FtpError)),
+  operation: fn(State) -> #(State, Result(a, FtpError)),
 ) -> actor.Next(State, Message) {
   case state.chunk {
     True -> {
@@ -765,8 +800,8 @@ fn guard_chunk(
 fn guard_chunk_open(
   state: State,
   caller: process.Pid,
-  reply: Subject(FtpResult(DataStream)),
-  operation: fn(State) -> FtpResult(DataStream),
+  reply: Subject(Result(DataStream, FtpError)),
+  operation: fn(State) -> Result(DataStream, FtpError),
 ) -> actor.Next(State, Message) {
   case state.chunk {
     True -> {
@@ -794,8 +829,8 @@ fn guard_chunk_open(
 fn guard_chunk_open_pair(
   state: State,
   caller: process.Pid,
-  reply: Subject(FtpResult(#(DataStream, Response))),
-  operation: fn(State) -> FtpResult(#(DataStream, Response)),
+  reply: Subject(Result(#(DataStream, Response), FtpError)),
+  operation: fn(State) -> Result(#(DataStream, Response), FtpError),
 ) -> actor.Next(State, Message) {
   case state.chunk {
     True -> {

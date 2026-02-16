@@ -113,7 +113,7 @@
 ////
 //// ## Error handling
 ////
-//// All operations return `FtpResult(a)` which is `Result(a, FtpError)`.
+//// All operations return `Result(a, FtpError)`.
 //// Use `gftp/result.describe_error` for human-readable messages:
 ////
 //// ```gleam
@@ -138,10 +138,9 @@ import gftp/internal/command.{type Command}
 import gftp/internal/command/feat
 import gftp/internal/command/protection_level
 import gftp/internal/listener
-import gftp/internal/utils
 import gftp/mode.{type IpVersion, type Mode}
 import gftp/response.{type Response, Response}
-import gftp/result.{type FtpResult} as ftp_result
+import gftp/result.{type FtpError} as ftp_result
 import gftp/status.{type Status}
 import gftp/stream.{type DataStream}
 import gleam/bit_array
@@ -173,18 +172,11 @@ const epsv_port_regex = "\\(\\|\\|\\|(\\d+)\\|\\)"
 /// Regular expression to parse the size of the file from the response of the SIZE command.
 const size_regex = "\\s+(\\d+)\\s*$"
 
-/// The features supported by the server, as returned by the FEAT command (RFC 2389).
-///
-/// A feature has a key representing the name of the feature, and an optional value
-/// representing any parameters for that feature.
-pub type Features =
-  feat.Features
-
 /// A function that creates a new stream for the data connection in passive mode.
 ///
-/// It takes the socket address and port as arguments and returns a `FtpResult` containing either a `DataStream` or an `FtpError`.
+/// It takes the socket address and port as arguments and returns a `Result` containing either a `DataStream` or an `FtpError`.
 pub type PassiveStreamBuilder =
-  fn(String, Int) -> FtpResult(DataStream)
+  fn(String, Int) -> Result(DataStream, FtpError)
 
 /// A client to interact with an FTP server. This is the main entry point for using gftp.
 pub opaque type FtpClient {
@@ -217,7 +209,7 @@ pub opaque type FtpClient {
 /// let assert Ok(client) = gftp.connect("ftp.example.com", 21)
 /// let assert Ok(_) = gftp.login(client, "user", "password")
 /// ```
-pub fn connect(host: String, port: Int) -> FtpResult(FtpClient) {
+pub fn connect(host: String, port: Int) -> Result(FtpClient, FtpError) {
   // Default timeout of 30 seconds
   connect_timeout(host, port, timeout: default_timeout)
 }
@@ -234,7 +226,7 @@ pub fn connect_timeout(
   host: String,
   port port: Int,
   timeout timeout: Int,
-) -> FtpResult(FtpClient) {
+) -> Result(FtpClient, FtpError) {
   mug.ConnectionOptions(
     host: host,
     port: port,
@@ -253,7 +245,7 @@ pub fn connect_timeout(
 /// 
 /// On success, returns a `FtpClient` instance that can be used to interact with the FTP server.
 /// On failure, returns an `FtpError` describing the issue.
-pub fn connect_with_stream(stream: mug.Socket) -> FtpResult(FtpClient) {
+pub fn connect_with_stream(stream: mug.Socket) -> Result(FtpClient, FtpError) {
   let client =
     FtpClient(
       data_stream: stream.Tcp(stream),
@@ -343,7 +335,7 @@ pub fn with_nat_workaround(
 pub fn into_secure(
   ftp_client: FtpClient,
   ssl_options: kafein.WrapOptions,
-) -> FtpResult(FtpClient) {
+) -> Result(FtpClient, FtpError) {
   // send auth and get Auth Ok response
   use _ <- result.try(perform(ftp_client, command.Auth))
   use _ <- result.try(read_response(ftp_client, status.AuthOk))
@@ -384,7 +376,7 @@ pub fn connect_secure_implicit(
   port: Int,
   ssl_options: kafein.WrapOptions,
   timeout: Int,
-) -> FtpResult(FtpClient) {
+) -> Result(FtpClient, FtpError) {
   use socket <- result.try(
     mug.ConnectionOptions(
       host: host,
@@ -435,7 +427,7 @@ pub fn login(
   ftp_client: FtpClient,
   username: String,
   password: String,
-) -> FtpResult(Nil) {
+) -> Result(Nil, FtpError) {
   use _ <- result.try(perform(ftp_client, command.User(username)))
   use auth_response <- result.try(
     read_response_in(ftp_client, [status.LoggedIn, status.NeedPassword]),
@@ -455,7 +447,9 @@ pub fn login(
 /// Perform clear command channel (CCC).
 /// Once the command is performed, the command channel will be encrypted no more.
 /// The data stream will still be secure.
-pub fn clear_command_channel(ftp_client: FtpClient) -> FtpResult(FtpClient) {
+pub fn clear_command_channel(
+  ftp_client: FtpClient,
+) -> Result(FtpClient, FtpError) {
   use _ <- result.try(perform(ftp_client, command.ClearCommandChannel))
   use _ <- result.try(read_response(ftp_client, status.CommandOk))
 
@@ -473,7 +467,7 @@ pub fn clear_command_channel(ftp_client: FtpClient) -> FtpResult(FtpClient) {
 /// ```gleam
 /// let assert Ok(_) = gftp.cwd(client, "/pub/data")
 /// ```
-pub fn cwd(ftp_client: FtpClient, path: String) -> FtpResult(Nil) {
+pub fn cwd(ftp_client: FtpClient, path: String) -> Result(Nil, FtpError) {
   use _ <- result.try(perform(ftp_client, command.Cwd(path)))
   use _ <- result.try(read_response(ftp_client, status.RequestedFileActionOk))
 
@@ -481,7 +475,7 @@ pub fn cwd(ftp_client: FtpClient, path: String) -> FtpResult(Nil) {
 }
 
 /// Change the current working directory on the FTP server to the parent directory of the current directory.
-pub fn cdup(ftp_client: FtpClient) -> FtpResult(Nil) {
+pub fn cdup(ftp_client: FtpClient) -> Result(Nil, FtpError) {
   use _ <- result.try(perform(ftp_client, command.Cdup))
   use _ <- result.try(
     read_response_in(ftp_client, [
@@ -498,18 +492,18 @@ pub fn cdup(ftp_client: FtpClient) -> FtpResult(Nil) {
 /// ```gleam
 /// let assert Ok(cwd) = gftp.pwd(client)
 /// ```
-pub fn pwd(ftp_client: FtpClient) -> FtpResult(String) {
+pub fn pwd(ftp_client: FtpClient) -> Result(String, FtpError) {
   use _ <- result.try(perform(ftp_client, command.Pwd))
   use response <- result.try(read_response(ftp_client, status.PathCreated))
-  use body <- result.try(utils.response_to_string(response))
+  use body <- result.try(response_to_ftp_string(response))
 
   body
-  |> utils.extract_str("\"")
+  |> extract_str("\"")
   |> result.map_error(fn(_) { ftp_result.BadResponse })
 }
 
 /// Send a NOOP command to the FTP server to keep the connection alive or check if the server is responsive.
-pub fn noop(ftp_client: FtpClient) -> FtpResult(Nil) {
+pub fn noop(ftp_client: FtpClient) -> Result(Nil, FtpError) {
   use _ <- result.try(perform(ftp_client, command.Noop))
   use _ <- result.try(read_response(ftp_client, status.CommandOk))
 
@@ -523,7 +517,7 @@ pub fn eprt(
   address: String,
   port: Int,
   ip_version: IpVersion,
-) -> FtpResult(Nil) {
+) -> Result(Nil, FtpError) {
   use _ <- result.try(perform(
     ftp_client,
     command.Eprt(address, port, ip_version),
@@ -538,7 +532,7 @@ pub fn eprt(
 /// ```gleam
 /// let assert Ok(_) = gftp.mkd(client, "new_folder")
 /// ```
-pub fn mkd(ftp_client: FtpClient, path: String) -> FtpResult(Nil) {
+pub fn mkd(ftp_client: FtpClient, path: String) -> Result(Nil, FtpError) {
   use _ <- result.try(perform(ftp_client, command.Mkd(path)))
   use _ <- result.try(read_response(ftp_client, status.PathCreated))
 
@@ -558,7 +552,7 @@ pub fn mkd(ftp_client: FtpClient, path: String) -> FtpResult(Nil) {
 pub fn transfer_type(
   ftp_client: FtpClient,
   file_type: file_type.FileType,
-) -> FtpResult(Nil) {
+) -> Result(Nil, FtpError) {
   use _ <- result.try(perform(ftp_client, command.Type(file_type)))
   use _ <- result.try(read_response(ftp_client, status.CommandOk))
 
@@ -574,7 +568,7 @@ pub fn transfer_type(
 /// let assert Ok(_) = gftp.quit(client)
 /// let assert Ok(_) = gftp.shutdown(client)
 /// ```
-pub fn quit(ftp_client: FtpClient) -> FtpResult(Nil) {
+pub fn quit(ftp_client: FtpClient) -> Result(Nil, FtpError) {
   use _ <- result.try(perform(ftp_client, command.Quit))
   use _ <- result.try(read_response(ftp_client, status.Closing))
 
@@ -584,7 +578,7 @@ pub fn quit(ftp_client: FtpClient) -> FtpResult(Nil) {
 /// Close the underlying socket connection to the FTP server.
 ///
 /// You should call `quit` before this to gracefully end the FTP session.
-pub fn shutdown(ftp_client: FtpClient) -> FtpResult(Nil) {
+pub fn shutdown(ftp_client: FtpClient) -> Result(Nil, FtpError) {
   ftp_client.data_stream
   |> stream.shutdown()
   |> result.map_error(ftp_result.Socket)
@@ -599,7 +593,7 @@ pub fn rename(
   ftp_client: FtpClient,
   from_name: String,
   to_name: String,
-) -> FtpResult(Nil) {
+) -> Result(Nil, FtpError) {
   use _ <- result.try(perform(ftp_client, command.RenameFrom(from_name)))
   use _ <- result.try(read_response(ftp_client, status.RequestFilePending))
   use _ <- result.try(perform(ftp_client, command.RenameTo(to_name)))
@@ -613,7 +607,7 @@ pub fn rename(
 /// ```gleam
 /// let assert Ok(_) = gftp.rmd(client, "old_folder")
 /// ```
-pub fn rmd(ftp_client: FtpClient, path: String) -> FtpResult(Nil) {
+pub fn rmd(ftp_client: FtpClient, path: String) -> Result(Nil, FtpError) {
   use _ <- result.try(perform(ftp_client, command.Rmd(path)))
   use _ <- result.try(read_response(ftp_client, status.RequestedFileActionOk))
 
@@ -625,7 +619,7 @@ pub fn rmd(ftp_client: FtpClient, path: String) -> FtpResult(Nil) {
 /// ```gleam
 /// let assert Ok(_) = gftp.dele(client, "unwanted_file.txt")
 /// ```
-pub fn dele(ftp_client: FtpClient, path: String) -> FtpResult(Nil) {
+pub fn dele(ftp_client: FtpClient, path: String) -> Result(Nil, FtpError) {
   use _ <- result.try(perform(ftp_client, command.Dele(path)))
   use _ <- result.try(read_response(ftp_client, status.RequestedFileActionOk))
 
@@ -638,7 +632,7 @@ pub fn dele(ftp_client: FtpClient, path: String) -> FtpResult(Nil) {
 /// After issuing a REST command, the client must send the appropriate FTP command to transfer the file
 ///
 /// It is possible to cancel the REST command, sending a REST command with offset 0
-pub fn rest(ftp_client: FtpClient, offset: Int) -> FtpResult(Nil) {
+pub fn rest(ftp_client: FtpClient, offset: Int) -> Result(Nil, FtpError) {
   use _ <- result.try(perform(ftp_client, command.Rest(offset)))
   use _ <- result.try(read_response(ftp_client, status.RequestFilePending))
 
@@ -651,7 +645,7 @@ pub fn rest(ftp_client: FtpClient, offset: Int) -> FtpResult(Nil) {
 /// 
 /// This function should only be used when a file transfer is in progress, by calling it
 /// from within the reader or writer function passed to `retr`, `stor` or `appe`, otherwise it may put the client in an inconsistent state.
-pub fn abor(ftp_client: FtpClient) -> FtpResult(Nil) {
+pub fn abor(ftp_client: FtpClient) -> Result(Nil, FtpError) {
   use _ <- result.try(perform(ftp_client, command.Abor))
   use response <- result.try(
     read_response_in(ftp_client, [
@@ -686,8 +680,8 @@ pub fn abor(ftp_client: FtpClient) -> FtpResult(Nil) {
 pub fn retr(
   ftp_client: FtpClient,
   path: String,
-  reader: fn(DataStream) -> FtpResult(Nil),
-) -> FtpResult(Nil) {
+  reader: fn(DataStream) -> Result(Nil, FtpError),
+) -> Result(Nil, FtpError) {
   use data_stream <- result.try(data_command(ftp_client, command.Retr(path)))
   use _ <- result.try(
     read_response_in(ftp_client, [status.AboutToSend, status.AlreadyOpen]),
@@ -712,8 +706,8 @@ pub fn retr(
 pub fn stor(
   ftp_client: FtpClient,
   path: String,
-  writer: fn(DataStream) -> FtpResult(Nil),
-) -> FtpResult(Nil) {
+  writer: fn(DataStream) -> Result(Nil, FtpError),
+) -> Result(Nil, FtpError) {
   use data_stream <- result.try(data_command(ftp_client, command.Stor(path)))
   use _ <- result.try(
     read_response_in(ftp_client, [status.AboutToSend, status.AlreadyOpen]),
@@ -735,8 +729,8 @@ pub fn stor(
 pub fn appe(
   ftp_client: FtpClient,
   path: String,
-  writer: fn(DataStream) -> FtpResult(Nil),
-) -> FtpResult(Nil) {
+  writer: fn(DataStream) -> Result(Nil, FtpError),
+) -> Result(Nil, FtpError) {
   use data_stream <- result.try(data_command(ftp_client, command.Appe(path)))
   use _ <- result.try(
     read_response_in(ftp_client, [status.AboutToSend, status.AlreadyOpen]),
@@ -769,7 +763,7 @@ pub fn appe(
 pub fn list(
   ftp_client: FtpClient,
   pathname: Option(String),
-) -> FtpResult(List(String)) {
+) -> Result(List(String), FtpError) {
   stream_lines(ftp_client, command.List(pathname), status.AboutToSend)
 }
 
@@ -783,7 +777,7 @@ pub fn list(
 pub fn nlst(
   ftp_client: FtpClient,
   pathname: Option(String),
-) -> FtpResult(List(String)) {
+) -> Result(List(String), FtpError) {
   stream_lines(ftp_client, command.Nlst(pathname), status.AboutToSend)
 }
 
@@ -811,7 +805,7 @@ pub fn nlst(
 pub fn mlsd(
   ftp_client: FtpClient,
   pathname: Option(String),
-) -> FtpResult(List(String)) {
+) -> Result(List(String), FtpError) {
   stream_lines(ftp_client, command.Mlsd(pathname), status.AboutToSend)
 }
 
@@ -836,13 +830,13 @@ pub fn mlsd(
 pub fn mlst(
   ftp_client: FtpClient,
   pathname: Option(String),
-) -> FtpResult(String) {
+) -> Result(String, FtpError) {
   use _ <- result.try(perform(ftp_client, command.Mlst(pathname)))
   use response <- result.try(read_response(
     ftp_client,
     status.RequestedFileActionOk,
   ))
-  use body <- result.try(utils.response_to_string(response))
+  use body <- result.try(response_to_ftp_string(response))
   // read line 1 (not 0, 1)
   body
   |> string.split("\r\n")
@@ -856,13 +850,19 @@ pub fn mlst(
 /// ```gleam
 /// let assert Ok(mtime) = gftp.mdtm(client, "file.txt")
 /// ```
-pub fn mdtm(ftp_client: FtpClient, pathname: String) -> FtpResult(Timestamp) {
-  let assert Ok(regex) = regexp.from_string(mdtm_regex)
+pub fn mdtm(
+  ftp_client: FtpClient,
+  pathname: String,
+) -> Result(Timestamp, FtpError) {
+  use regex <- result.try(
+    regexp.from_string(mdtm_regex)
+    |> result.replace_error(ftp_result.BadResponse),
+  )
   use _ <- result.try(perform(ftp_client, command.Mdtm(pathname)))
   use response <- result.try(read_response(ftp_client, status.File))
-  use body <- result.try(utils.response_to_string(response))
+  use body <- result.try(response_to_ftp_string(response))
 
-  case utils.re_matches(regex, body) {
+  case re_matches(regex, body) {
     Ok([
       Some(year),
       Some(month),
@@ -871,12 +871,12 @@ pub fn mdtm(ftp_client: FtpClient, pathname: String) -> FtpResult(Timestamp) {
       Some(minutes),
       Some(seconds),
     ]) -> {
-      use year <- result.try(utils.parse_int(year))
-      use month <- result.try(utils.parse_month(month))
-      use day <- result.try(utils.parse_int(day))
-      use hours <- result.try(utils.parse_int(hours))
-      use minutes <- result.try(utils.parse_int(minutes))
-      use seconds <- result.try(utils.parse_int(seconds))
+      use year <- result.try(parse_int(year))
+      use month <- result.try(parse_month(month))
+      use day <- result.try(parse_int(day))
+      use hours <- result.try(parse_int(hours))
+      use minutes <- result.try(parse_int(minutes))
+      use seconds <- result.try(parse_int(seconds))
 
       Ok(timestamp.from_calendar(
         date: calendar.Date(year: year, month: month, day: day),
@@ -898,14 +898,17 @@ pub fn mdtm(ftp_client: FtpClient, pathname: String) -> FtpResult(Timestamp) {
 /// ```gleam
 /// let assert Ok(size) = gftp.size(client, "file.txt")
 /// ```
-pub fn size(ftp_client: FtpClient, pathname: String) -> FtpResult(Int) {
-  let assert Ok(regex) = regexp.from_string(size_regex)
+pub fn size(ftp_client: FtpClient, pathname: String) -> Result(Int, FtpError) {
+  use regex <- result.try(
+    regexp.from_string(size_regex)
+    |> result.replace_error(ftp_result.BadResponse),
+  )
   use _ <- result.try(perform(ftp_client, command.Size(pathname)))
   use response <- result.try(read_response(ftp_client, status.File))
-  use body <- result.try(utils.response_to_string(response))
+  use body <- result.try(response_to_ftp_string(response))
 
-  case utils.re_matches(regex, body) {
-    Ok([Some(size)]) -> utils.parse_int(size)
+  case re_matches(regex, body) {
+    Ok([Some(size)]) -> parse_int(size)
     _ -> Error(ftp_result.BadResponse)
   }
 }
@@ -920,10 +923,12 @@ pub fn size(ftp_client: FtpClient, pathname: String) -> FtpResult(Int) {
 /// let assert Ok(features) = gftp.feat(client)
 /// let supports_mlst = dict.has_key(features, "MLST")
 /// ```
-pub fn feat(ftp_client: FtpClient) -> FtpResult(Features) {
+pub fn feat(
+  ftp_client: FtpClient,
+) -> Result(dict.Dict(String, Option(String)), FtpError) {
   use _ <- result.try(perform(ftp_client, command.Feat))
   use response <- result.try(read_response(ftp_client, status.System))
-  use body <- result.try(utils.response_to_string(response))
+  use body <- result.try(response_to_ftp_string(response))
 
   let lines = string.split(body, "\n")
   case lines {
@@ -957,7 +962,7 @@ pub fn opts(
   ftp_client: FtpClient,
   option: String,
   value: Option(String),
-) -> FtpResult(Nil) {
+) -> Result(Nil, FtpError) {
   use _ <- result.try(perform(ftp_client, command.Opts(option, value)))
   use _ <- result.try(read_response(ftp_client, status.CommandOk))
 
@@ -969,7 +974,10 @@ pub fn opts(
 /// ```gleam
 /// let assert Ok(response) = gftp.site(client, "CHMOD 755 file.txt")
 /// ```
-pub fn site(ftp_client: FtpClient, sub_command: String) -> FtpResult(Response) {
+pub fn site(
+  ftp_client: FtpClient,
+  sub_command: String,
+) -> Result(Response, FtpError) {
   use _ <- result.try(perform(ftp_client, command.Site(sub_command)))
   read_response_in(ftp_client, [status.CommandOk, status.Help])
 }
@@ -987,7 +995,7 @@ pub fn custom_command(
   ftp_client: FtpClient,
   command_str: String,
   expected_statuses: List(Status),
-) -> FtpResult(Response) {
+) -> Result(Response, FtpError) {
   use _ <- result.try(perform(ftp_client, command.Custom(command_str)))
   read_response_in(ftp_client, expected_statuses)
 }
@@ -1014,8 +1022,8 @@ pub fn custom_data_command(
   ftp_client: FtpClient,
   command_str: String,
   expected_statuses: List(Status),
-  on_data_stream: fn(DataStream, Response) -> FtpResult(Nil),
-) -> FtpResult(Nil) {
+  on_data_stream: fn(DataStream, Response) -> Result(Nil, FtpError),
+) -> Result(Nil, FtpError) {
   use data_stream <- result.try(data_command(
     ftp_client,
     command.Custom(command_str),
@@ -1031,7 +1039,7 @@ pub fn custom_data_command(
 pub fn read_lines_from_stream(
   data_stream: DataStream,
   timeout: Int,
-) -> FtpResult(List(String)) {
+) -> Result(List(String), FtpError) {
   stream.set_line_mode(data_stream)
   read_lines_from_stream_loop([], data_stream, timeout)
 }
@@ -1042,7 +1050,7 @@ pub fn read_lines_from_stream(
 
 /// Read the server's welcome message (status 220 Ready) and return
 /// an updated FtpClient with the welcome_message field populated.
-fn read_welcome_message(client: FtpClient) -> FtpResult(FtpClient) {
+fn read_welcome_message(client: FtpClient) -> Result(FtpClient, FtpError) {
   stream.set_line_mode(client.data_stream)
   case read_response(client, status.Ready) {
     Ok(resp) -> {
@@ -1064,7 +1072,7 @@ fn read_welcome_message(client: FtpClient) -> FtpResult(FtpClient) {
 fn read_response(
   ftp_client: FtpClient,
   expected_status: Status,
-) -> FtpResult(Response) {
+) -> Result(Response, FtpError) {
   read_response_in(ftp_client, [expected_status])
 }
 
@@ -1075,7 +1083,7 @@ fn read_response(
 pub fn read_response_in(
   ftp_client: FtpClient,
   expected_statuses: List(Status),
-) -> FtpResult(Response) {
+) -> Result(Response, FtpError) {
   use line <- result.try(read_line(ftp_client))
   use status <- result.try(status_from_bytes(line))
 
@@ -1109,13 +1117,16 @@ pub fn read_response_in(
 }
 
 /// Read a line from the control connection stream and return it as a string along with bytes read.
-fn read_line(ftp_client: FtpClient) -> FtpResult(String) {
+fn read_line(ftp_client: FtpClient) -> Result(String, FtpError) {
   read_line_with(ftp_client.data_stream, ftp_client.data_timeout)
 }
 
 /// Read a line from the provided data stream with the specified timeout and return it as a string.
 /// Expects the stream to be in {packet, line} mode, where recv returns one complete line per call.
-fn read_line_with(data_stream: DataStream, timeout: Int) -> FtpResult(String) {
+fn read_line_with(
+  data_stream: DataStream,
+  timeout: Int,
+) -> Result(String, FtpError) {
   case stream.receive(data_stream, timeout) {
     Ok(bytes) -> {
       let bytes = strip_trailing_lf(bytes)
@@ -1133,10 +1144,12 @@ fn strip_trailing_lf(bytes: BitArray) -> BitArray {
   case size > 0 {
     True ->
       case bit_array.slice(bytes, size - 1, 1) {
-        Ok(<<0x0A>>) -> {
-          let assert Ok(trimmed) = bit_array.slice(bytes, 0, size - 1)
-          trimmed
-        }
+        Ok(<<0x0A>>) ->
+          case bit_array.slice(bytes, 0, size - 1) {
+            Ok(trimmed) -> trimmed
+            // size > 0 guarantees a valid slice, so this branch is unreachable
+            Error(_) -> bytes
+          }
         _ -> bytes
       }
     False -> bytes
@@ -1148,7 +1161,7 @@ fn read_response_body(
   acc: List(String),
   ftp_client: FtpClient,
   expected: List(BitArray),
-) -> FtpResult(List(String)) {
+) -> Result(List(String), FtpError) {
   use line <- result.try(read_line(ftp_client))
 
   case
@@ -1164,7 +1177,7 @@ fn read_response_body(
 }
 
 /// Read the `Status` code from the response line and convert it to a `Status` type.
-fn status_from_bytes(line: String) -> FtpResult(Status) {
+fn status_from_bytes(line: String) -> Result(Status, FtpError) {
   line
   |> string.slice(0, 3)
   |> int.parse
@@ -1173,7 +1186,7 @@ fn status_from_bytes(line: String) -> FtpResult(Status) {
 }
 
 /// Write data to stream with the command to perform
-fn perform(ftp_client: FtpClient, command: Command) -> FtpResult(Nil) {
+fn perform(ftp_client: FtpClient, command: Command) -> Result(Nil, FtpError) {
   command
   |> command.to_string
   |> fn(s) { s <> "\r\n" }
@@ -1188,7 +1201,7 @@ fn perform(ftp_client: FtpClient, command: Command) -> FtpResult(Nil) {
 fn default_passive_stream_builder(
   host: String,
   port: Int,
-) -> FtpResult(DataStream) {
+) -> Result(DataStream, FtpError) {
   mug.new(host, port)
   |> mug.connect()
   |> result.map_error(ftp_result.ConnectionError)
@@ -1202,7 +1215,7 @@ fn default_passive_stream_builder(
 pub fn data_command(
   ftp_client: FtpClient,
   command: Command,
-) -> FtpResult(DataStream) {
+) -> Result(DataStream, FtpError) {
   case ftp_client.mode {
     mode.Active(timeout) -> data_command_active(ftp_client, command, timeout)
     mode.Passive -> data_command_passive(ftp_client, command)
@@ -1215,13 +1228,13 @@ fn data_command_active(
   ftp_client: FtpClient,
   command: Command,
   timeout: Int,
-) -> FtpResult(DataStream) {
+) -> Result(DataStream, FtpError) {
   // Get the local IP of the control connection
   use #(local_ip, _) <- result.try(
     stream.local_address(ftp_client.data_stream)
     |> result.map_error(ftp_result.Socket),
   )
-  let is_ipv6 = utils.is_ipv6_address(local_ip)
+  let is_ipv6 = is_ipv6_address(local_ip)
   // Create a TCP listener on an ephemeral port with the matching address family
   let ip_family = case is_ipv6 {
     True -> listener.Ipv6
@@ -1272,7 +1285,7 @@ fn send_port_command(
   local_ip: String,
   listen_port: Int,
   is_ipv6: Bool,
-) -> FtpResult(Nil) {
+) -> Result(Nil, FtpError) {
   case is_ipv6 {
     True -> perform(ftp_client, command.Eprt(local_ip, listen_port, mode.V6))
     False -> {
@@ -1296,7 +1309,7 @@ fn build_active_port_arg(ip: String, port: Int) -> String {
 fn data_command_passive(
   ftp_client: FtpClient,
   command: Command,
-) -> FtpResult(DataStream) {
+) -> Result(DataStream, FtpError) {
   use _ <- result.try(perform(ftp_client, command.Pasv))
   use response <- result.try(read_response(ftp_client, status.PassiveMode))
   use #(address, port) <- result.try(parse_passive_address_from_response(
@@ -1322,7 +1335,7 @@ fn data_command_passive(
 fn data_command_extended_passive(
   ftp_client: FtpClient,
   command: Command,
-) -> FtpResult(DataStream) {
+) -> Result(DataStream, FtpError) {
   use _ <- result.try(perform(ftp_client, command.Epsv))
   use response <- result.try(read_response(
     ftp_client,
@@ -1342,10 +1355,13 @@ fn data_command_extended_passive(
 /// Parse the passive mode address and port from the server's response to the `PASV` command.
 fn parse_passive_address_from_response(
   response: Response,
-) -> FtpResult(#(String, Int)) {
-  let assert Ok(regex) = regexp.from_string(pasv_port_regex)
-  use response <- result.try(utils.response_to_string(response))
-  case utils.re_matches(regex, response) {
+) -> Result(#(String, Int), FtpError) {
+  use regex <- result.try(
+    regexp.from_string(pasv_port_regex)
+    |> result.replace_error(ftp_result.BadResponse),
+  )
+  use response <- result.try(response_to_ftp_string(response))
+  case re_matches(regex, response) {
     Ok([Some(a), Some(b), Some(c), Some(d), Some(msb), Some(lsb)]) -> {
       let address = string.join([a, b, c, d], ".")
       use msb <- result.try(
@@ -1370,11 +1386,14 @@ fn parse_passive_address_from_response(
 }
 
 /// Parse the extended passive mode port from the server's response to the `EPSV` command.
-fn parse_epsv_address_from_response(response: Response) -> FtpResult(Int) {
-  let assert Ok(regex) = regexp.from_string(epsv_port_regex)
-  use response <- result.try(utils.response_to_string(response))
+fn parse_epsv_address_from_response(response: Response) -> Result(Int, FtpError) {
+  use regex <- result.try(
+    regexp.from_string(epsv_port_regex)
+    |> result.replace_error(ftp_result.BadResponse),
+  )
+  use response <- result.try(response_to_ftp_string(response))
 
-  case utils.re_matches(regex, response) {
+  case re_matches(regex, response) {
     Ok([Some(port_str)]) ->
       port_str
       |> int.parse
@@ -1390,7 +1409,7 @@ fn build_data_channel_stream(
   ftp_client: FtpClient,
   host: String,
   port: Int,
-) -> FtpResult(DataStream) {
+) -> Result(DataStream, FtpError) {
   use stream <- result.try(ftp_client.passive_stream_builder(host, port))
 
   case ftp_client.tls_options {
@@ -1409,7 +1428,7 @@ fn build_data_channel_stream(
 pub fn finalize_data_command(
   ftp_client: FtpClient,
   data_stream: DataStream,
-) -> FtpResult(Nil) {
+) -> Result(Nil, FtpError) {
   // Close the data stream after the reader/writer is done.
   // Ignore shutdown errors (e.g. Enotconn) since the server may have already
   // closed the data connection, which is normal FTP behavior after data transfer.
@@ -1430,7 +1449,7 @@ fn stream_lines(
   ftp_client: FtpClient,
   command: Command,
   open_code: Status,
-) -> FtpResult(List(String)) {
+) -> Result(List(String), FtpError) {
   use data_stream <- result.try(data_command(ftp_client, command))
   use _ <- result.try(
     read_response_in(ftp_client, [open_code, status.AlreadyOpen]),
@@ -1449,10 +1468,74 @@ fn read_lines_from_stream_loop(
   acc: List(String),
   data_stream: DataStream,
   timeout: Int,
-) -> FtpResult(List(String)) {
+) -> Result(List(String), FtpError) {
   case read_line_with(data_stream, timeout) {
     Ok(line) -> read_lines_from_stream_loop([line, ..acc], data_stream, timeout)
     Error(ftp_result.Socket(mug.Closed)) -> acc |> list.reverse |> Ok
     Error(e) -> Error(e)
   }
+}
+
+// ---------------------------------------------------------------------------
+// Private helpers (moved from gftp/internal/utils)
+// ---------------------------------------------------------------------------
+
+/// Get the substring between the first and last occurrence of the provided token.
+/// Returns `Error(Nil)` if the token is not found.
+fn extract_str(body: String, token: String) -> Result(String, Nil) {
+  case string.split(body, token) {
+    [_] -> Error(Nil)
+    [_, single] -> Ok(single)
+    [_, ..rest] -> {
+      rest
+      |> list.take(list.length(rest) - 1)
+      |> string.join(token)
+      |> Ok
+    }
+    _ -> Error(Nil)
+  }
+}
+
+/// Match a regular expression against a string and extract submatches.
+fn re_matches(
+  re: regexp.Regexp,
+  line: String,
+) -> Result(List(Option(String)), Nil) {
+  case regexp.scan(re, line) {
+    [] -> Error(Nil)
+    matches ->
+      matches
+      |> list.map(fn(match) { match.submatches })
+      |> list.flatten()
+      |> Ok
+  }
+}
+
+/// Parse a string into an integer, returning a BadResponse error on failure.
+fn parse_int(s: String) -> Result(Int, FtpError) {
+  case int.parse(s) {
+    Ok(i) -> Ok(i)
+    Error(_) -> Error(ftp_result.BadResponse)
+  }
+}
+
+/// Parse a numeric string into a Month, returning a BadResponse error on failure.
+fn parse_month(s: String) -> Result(calendar.Month, FtpError) {
+  use num <- result.try(parse_int(s))
+  case calendar.month_from_int(num) {
+    Ok(month) -> Ok(month)
+    Error(_) -> Error(ftp_result.BadResponse)
+  }
+}
+
+/// Convert a Response to its body string, returning a BadResponse error on failure.
+fn response_to_ftp_string(resp: Response) -> Result(String, FtpError) {
+  resp
+  |> response.to_string
+  |> result.map_error(fn(_) { ftp_result.BadResponse })
+}
+
+/// Check if a string is an IPv6 address by checking for the presence of a colon.
+fn is_ipv6_address(s: String) -> Bool {
+  string.contains(s, ":")
 }

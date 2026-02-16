@@ -1,6 +1,6 @@
-//// Error types and result aliases for gftp operations.
+//// Error types for gftp operations.
 ////
-//// All gftp functions return `FtpResult(a)` which is `Result(a, FtpError)`.
+//// All gftp functions return `Result(a, FtpError)`.
 ////
 //// ```gleam
 //// import gftp
@@ -19,10 +19,7 @@ import gftp/response.{type Response}
 import kafein
 import mug
 
-/// The FtpResult type is a Result that can contain either a successful value of type a or an FtpError.
-pub type FtpResult(a) =
-  Result(a, FtpError)
-
+/// Error type returned by all gftp operations.
 pub type FtpError {
   /// Connection error
   ConnectionError(mug.ConnectError)
