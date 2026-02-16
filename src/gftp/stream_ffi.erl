@@ -4,7 +4,8 @@
          set_tcp_packet_line/1, set_tcp_packet_raw/1,
          set_ssl_packet_line/1, set_ssl_packet_raw/1,
          local_address/1, peer_address/1,
-         tcp_controlling_process/2, ssl_controlling_process/2]).
+         tcp_controlling_process/2, ssl_controlling_process/2,
+         safe_ssl_shutdown/1]).
 
 %% Workaround for kafein bug: kafein passes the server_name_indication as a
 %% binary to ssl:connect, but Erlang's ssl module expects a charlist.
@@ -61,4 +62,16 @@ ssl_controlling_process(Socket, Pid) ->
     case ssl:controlling_process(Socket, Pid) of
         ok -> {ok, nil};
         {error, Reason} -> {error, Reason}
+    end.
+
+%% Workaround for kafein crash: kafein.shutdown can crash with
+%% badmatch on some POSIX errors (e.g. enotconn) that it doesn't
+%% handle. This wrapper catches those crashes and returns {ok, nil}
+%% since the socket is already disconnected.
+safe_ssl_shutdown(Socket) ->
+    try kafein:shutdown(Socket) of
+        {ok, nil} -> {ok, nil};
+        {error, Reason} -> {error, Reason}
+    catch
+        _:_ -> {ok, nil}
     end.

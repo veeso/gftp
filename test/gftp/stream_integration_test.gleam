@@ -1,14 +1,12 @@
+import envoy
 import gftp/stream.{Ssl, Tcp}
 import gleam/bit_array
 import gleam/string
 import kafein
 import mug
 
-@external(erlang, "stream_test_ffi", "get_env")
-fn get_env(name: String) -> Result(String, Nil)
-
 fn require_integration() -> Bool {
-  case get_env("GFTP_INTEGRATION_TESTS") {
+  case envoy.get("GFTP_INTEGRATION_TESTS") {
     Ok(_) -> True
     Error(_) -> False
   }
