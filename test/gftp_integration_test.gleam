@@ -1,3 +1,4 @@
+import envoy
 import gftp.{type FtpClient}
 import gftp/actor as ftp_actor
 import gftp/file_type
@@ -18,39 +19,15 @@ import testcontainers_gleam
 import testcontainers_gleam/container.{type Container}
 import testcontainers_gleam/wait_strategy
 
-@external(erlang, "stream_test_ffi", "get_env")
-fn get_env(name: String) -> Result(String, Nil)
-
-@external(erlang, "test_container_ffi", "start_ftp_container")
-fn start_ftp_container() -> String
-
-@external(erlang, "test_container_ffi", "get_ftp_port")
-fn get_ftp_port(container_id: String) -> Int
-
-@external(erlang, "test_container_ffi", "start_ftp_active_container")
-fn start_ftp_active_container() -> String
-
-@external(erlang, "test_container_ffi", "get_ftp_active_port")
-fn get_ftp_active_port(container_id: String) -> Int
-
-@external(erlang, "test_container_ffi", "start_ftps_container")
-fn start_ftps_container() -> String
-
-@external(erlang, "test_container_ffi", "get_ftps_port")
-fn get_ftps_port(container_id: String) -> Int
-
-@external(erlang, "test_container_ffi", "stop_container")
-fn stop_container(container_id: String) -> Nil
-
 fn require_integration() -> Bool {
-  case get_env("GFTP_INTEGRATION_TESTS") {
+  case envoy.get("GFTP_INTEGRATION_TESTS") {
     Ok(_) -> True
     Error(_) -> False
   }
 }
 
 fn require_active_mode() -> Bool {
-  case get_env("GFTP_ACTIVE_MODE_TESTS") {
+  case envoy.get("GFTP_ACTIVE_MODE_TESTS") {
     Ok(_) -> True
     Error(_) -> False
   }
@@ -94,6 +71,129 @@ fn with_ftp_connection(callback: fn(FtpClient) -> Nil) -> Nil {
   }
 }
 
+/// Run an integration test with a real FTPS connection.
+/// Starts a Docker FTP container with TLS enabled, connects,
+/// upgrades to TLS via AUTH TLS, logs in, runs the callback, then cleans up.
+/// Skipped unless GFTP_INTEGRATION_TESTS env var is set.
+fn with_ftps_connection(callback: fn(FtpClient) -> Nil) -> Nil {
+  case require_integration() {
+    False -> {
+      Nil
+    }
+    True -> {
+      let container = alpine_ftps_container()
+      let assert Ok(container) = testcontainers_gleam.start_container(container)
+      let container_id = container.container_id(container)
+
+      // Set up TLS inside the running container (install certs, start vsftpd on port 990)
+      setup_ftps(container_id)
+
+      let assert Ok(port) = container.mapped_port(container, 990)
+      let ssl_options =
+        kafein.default_options
+        |> kafein.verify(kafein.VerifyNone)
+      let assert Ok(client) =
+        gftp.connect_timeout("127.0.0.1", port, timeout: 30_000)
+        |> result.try(fn(client) { gftp.into_secure(client, ssl_options) })
+
+      let client =
+        gftp.with_passive_stream_builder(client, fn(host, port) {
+          // get mapped port for data
+          let assert Ok(data_port) = container.mapped_port(container, port)
+
+          mug.new(host, data_port)
+          |> mug.connect()
+          |> result.map_error(ftp_result.ConnectionError)
+          |> result.map(stream.Tcp)
+        })
+
+      let assert Ok(_) = gftp.login(client, "test", "test")
+      callback(client)
+      let assert Ok(_) = gftp.quit(client)
+      let assert Ok(_) = testcontainers_gleam.stop_container(container_id)
+      Nil
+    }
+  }
+}
+
+/// Run an integration test with an FTP connection in active mode.
+/// Starts a Docker FTP container with --network host, connects, logs in,
+/// switches to active mode, runs the callback, then cleans up.
+/// Skipped unless GFTP_INTEGRATION_TESTS env var is set.
+fn with_ftp_active_connection(callback: fn(FtpClient) -> Nil) -> Nil {
+  case require_active_mode() {
+    False -> Nil
+    True -> {
+      let container = alpine_ftp_active_container()
+      let assert Ok(container) = testcontainers_gleam.start_container(container)
+      let container_id = container.container_id(container)
+
+      let assert Ok(port) = container.mapped_port(container, 21)
+      let assert Ok(client) =
+        gftp.connect_timeout("127.0.0.1", port, timeout: 30_000)
+
+      let client =
+        gftp.with_passive_stream_builder(client, fn(host, port) {
+          // get mapped port for data
+          let assert Ok(data_port) = container.mapped_port(container, port)
+
+          mug.new(host, data_port)
+          |> mug.connect()
+          |> result.map_error(ftp_result.ConnectionError)
+          |> result.map(stream.Tcp)
+        })
+
+      let assert Ok(_) = gftp.login(client, "test", "test")
+      callback(client)
+      let assert Ok(_) = gftp.quit(client)
+      let assert Ok(_) = testcontainers_gleam.stop_container(container_id)
+      Nil
+    }
+  }
+}
+
+/// Run an integration test with an actor-wrapped FTP connection.
+fn with_actor_connection(callback: fn(ftp_actor.Handle) -> Nil) -> Nil {
+  case require_integration() {
+    False -> Nil
+    True -> {
+      let container = alpine_ftps_container()
+      let assert Ok(container) = testcontainers_gleam.start_container(container)
+      let container_id = container.container_id(container)
+
+      // Set up TLS inside the running container (install certs, start vsftpd on port 990)
+      setup_ftps(container_id)
+
+      let assert Ok(port) = container.mapped_port(container, 990)
+      let ssl_options =
+        kafein.default_options
+        |> kafein.verify(kafein.VerifyNone)
+      let assert Ok(client) =
+        gftp.connect_timeout("127.0.0.1", port, timeout: 30_000)
+        |> result.try(fn(client) { gftp.into_secure(client, ssl_options) })
+
+      let client =
+        gftp.with_passive_stream_builder(client, fn(host, port) {
+          // get mapped port for data
+          let assert Ok(data_port) = container.mapped_port(container, port)
+
+          mug.new(host, data_port)
+          |> mug.connect()
+          |> result.map_error(ftp_result.ConnectionError)
+          |> result.map(stream.Tcp)
+        })
+      let assert Ok(started) = ftp_actor.start(client)
+      let handle = started.data
+      let assert Ok(_) = ftp_actor.login(handle, "test", "test")
+      callback(handle)
+      let assert Ok(_) = ftp_actor.quit(handle)
+      let assert Ok(_) = testcontainers_gleam.stop_container(container_id)
+      Nil
+    }
+  }
+}
+
+/// setup function to create a Docker container with an FTP server for testing.
 fn alpine_ftp_container() -> Container {
   "delfer/alpine-ftp-server:latest"
   |> container.new()
@@ -105,6 +205,24 @@ fn alpine_ftp_container() -> Container {
   |> container.with_environment("ADDRESS", "127.0.0.1")
   |> container.with_waiting_strategy(wait_strategy.log("passwd:", 30_000, 500))
   |> container.with_auto_remove(True)
+}
+
+/// setup function to create a Docker container with an FTPS server for testing.
+/// Note: after starting, call setup_ftps(container_id) to install certs
+/// and start a second vsftpd instance with TLS on port 990.
+fn alpine_ftps_container() -> Container {
+  alpine_ftp_container()
+  |> container.with_exposed_port(990)
+}
+
+@external(erlang, "test_container_ffi", "setup_ftps")
+fn setup_ftps(container_id: String) -> Nil
+
+/// setup function to create a Docker container with an FTP server for active mode testing.
+/// Uses --network host so the server can connect back to the client's listener on 127.
+fn alpine_ftp_active_container() -> Container {
+  alpine_ftp_container()
+  |> container.with_network_mode("host")
 }
 
 // --- Connection and auth tests ---
@@ -442,27 +560,6 @@ pub fn rest_test() {
 // With host networking, the FTP server can connect back to the client's
 // listener on 127.0.0.1 for active mode data transfers.
 
-/// Run an integration test with an FTP connection in active mode.
-/// Starts a Docker FTP container with --network host, connects, logs in,
-/// switches to active mode, runs the callback, then cleans up.
-/// Skipped unless GFTP_INTEGRATION_TESTS env var is set.
-fn with_ftp_active_connection(callback: fn(FtpClient) -> Nil) -> Nil {
-  case require_active_mode() {
-    False -> Nil
-    True -> {
-      let container_id = start_ftp_active_container()
-      let port = get_ftp_active_port(container_id)
-      let assert Ok(client) =
-        gftp.connect_timeout("127.0.0.1", port, timeout: 30_000)
-      let assert Ok(_) = gftp.login(client, "test", "test")
-      let client = gftp.with_active_mode(client, 30_000)
-      callback(client)
-      let assert Ok(_) = gftp.quit(client)
-      stop_container(container_id)
-    }
-  }
-}
-
 pub fn active_mode_list_test() {
   with_ftp_active_connection(fn(client) {
     let assert Ok(_) = gftp.transfer_type(client, file_type.Binary)
@@ -522,30 +619,6 @@ pub fn active_mode_nlst_test() {
 
 // --- FTPS tests ---
 
-/// Run an integration test with a real FTPS connection.
-/// Starts a Docker FTP container with TLS enabled, connects,
-/// upgrades to TLS via AUTH TLS, logs in, runs the callback, then cleans up.
-/// Skipped unless GFTP_INTEGRATION_TESTS env var is set.
-fn with_ftps_connection(callback: fn(FtpClient) -> Nil) -> Nil {
-  case require_integration() {
-    False -> Nil
-    True -> {
-      let container_id = start_ftps_container()
-      let port = get_ftps_port(container_id)
-      let assert Ok(client) =
-        gftp.connect_timeout("127.0.0.1", port, timeout: 30_000)
-      let ssl_options =
-        kafein.default_options
-        |> kafein.verify(verify_type: kafein.VerifyNone)
-      let assert Ok(client) = gftp.into_secure(client, ssl_options)
-      let assert Ok(_) = gftp.login(client, "test", "test")
-      callback(client)
-      let assert Ok(_) = gftp.quit(client)
-      stop_container(container_id)
-    }
-  }
-}
-
 pub fn ftps_connect_and_login_test() {
   with_ftps_connection(fn(client) {
     let assert Ok(pwd) = gftp.pwd(client)
@@ -576,25 +649,6 @@ pub fn ftps_stor_and_retr_test() {
 }
 
 // --- Actor integration tests ---
-
-/// Run an integration test with an actor-wrapped FTP connection.
-fn with_actor_connection(callback: fn(ftp_actor.Handle) -> Nil) -> Nil {
-  case require_integration() {
-    False -> Nil
-    True -> {
-      let container_id = start_ftp_container()
-      let port = get_ftp_port(container_id)
-      let assert Ok(client) =
-        gftp.connect_timeout("127.0.0.1", port, timeout: 30_000)
-      let assert Ok(started) = ftp_actor.start(client)
-      let handle = started.data
-      let assert Ok(_) = ftp_actor.login(handle, "test", "test")
-      callback(handle)
-      let assert Ok(_) = ftp_actor.quit(handle)
-      stop_container(container_id)
-    }
-  }
-}
 
 pub fn actor_stor_and_retr_test() {
   with_actor_connection(fn(handle) {
@@ -681,10 +735,24 @@ pub fn actor_quit_test() {
   case require_integration() {
     False -> Nil
     True -> {
-      let container_id = start_ftp_container()
-      let port = get_ftp_port(container_id)
+      let container = alpine_ftp_container()
+      let assert Ok(container) = testcontainers_gleam.start_container(container)
+      let container_id = container.container_id(container)
+
+      let assert Ok(port) = container.mapped_port(container, 21)
       let assert Ok(client) =
         gftp.connect_timeout("127.0.0.1", port, timeout: 30_000)
+
+      let client =
+        gftp.with_passive_stream_builder(client, fn(host, port) {
+          let assert Ok(data_port) = container.mapped_port(container, port)
+
+          mug.new(host, data_port)
+          |> mug.connect()
+          |> result.map_error(ftp_result.ConnectionError)
+          |> result.map(stream.Tcp)
+        })
+
       let assert Ok(started) = ftp_actor.start(client)
       let handle = started.data
       let assert Ok(_) = ftp_actor.login(handle, "test", "test")
@@ -695,7 +763,8 @@ pub fn actor_quit_test() {
       // Actor process should be dead - verify by checking if the pid is alive
       let assert False = process.is_alive(started.pid)
 
-      stop_container(container_id)
+      let assert Ok(_) = testcontainers_gleam.stop_container(container_id)
+      Nil
     }
   }
 }

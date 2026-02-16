@@ -50,6 +50,12 @@ fn ssl_controlling_process(
   pid: Pid,
 ) -> Result(Nil, mug.Error)
 
+/// Workaround for kafein crash: kafein.shutdown can crash with
+/// badmatch on some POSIX errors (e.g. enotconn) instead of
+/// returning an error. This wrapper catches those crashes.
+@external(erlang, "stream_ffi", "safe_ssl_shutdown")
+fn safe_ssl_shutdown(socket: kafein.SslSocket) -> Result(Nil, mug.Error)
+
 @external(erlang, "stream_ffi", "local_address")
 fn tcp_local_address(socket: mug.Socket) -> Result(#(String, Int), mug.Error)
 
@@ -236,12 +242,10 @@ pub fn controlling_process(
   pid: Pid,
 ) -> Result(Nil, mug.Error) {
   case stream {
-    Ssl(ssl_socket, tcp_socket) -> {
-      case tcp_controlling_process(tcp_socket, pid) {
-        Ok(_) -> ssl_controlling_process(ssl_socket, pid)
-        Error(e) -> Error(e)
-      }
-    }
+    // For SSL streams, only transfer the SSL controlling process.
+    // The SSL process internally manages the underlying TCP socket;
+    // changing the TCP socket's controlling process would break SSL.
+    Ssl(ssl_socket, _) -> ssl_controlling_process(ssl_socket, pid)
     Tcp(tcp_socket) -> tcp_controlling_process(tcp_socket, pid)
   }
 }
@@ -250,7 +254,7 @@ pub fn controlling_process(
 /// It abstracts away the differences between the two types of streams and provides a unified interface for shutting them down.
 pub fn shutdown(stream: DataStream) -> Result(Nil, mug.Error) {
   case stream {
-    Ssl(ssl_socket, _) -> kafein.shutdown(ssl_socket)
+    Ssl(ssl_socket, _) -> safe_ssl_shutdown(ssl_socket)
     Tcp(tcp_socket) -> mug.shutdown(tcp_socket)
   }
 }

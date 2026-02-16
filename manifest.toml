@@ -24,12 +24,13 @@ packages = [
   { name = "ssl_verify_fun", version = "1.1.7", build_tools = ["mix", "rebar3", "make"], requirements = [], otp_app = "ssl_verify_fun", source = "hex", outer_checksum = "FE4C190E8F37401D30167C8C405EDA19469F34577987C76DDE613E838BBC67F8" },
   { name = "tesla", version = "1.16.0", build_tools = ["mix"], requirements = ["castore", "exjsx", "finch", "fuse", "gun", "hackney", "ibrowse", "jason", "mime", "mint", "mox", "msgpax", "poison", "telemetry"], otp_app = "tesla", source = "hex", outer_checksum = "EB3BDFC0C6C8A23B4E3D86558E812E3577ACFF1CB4ACB6CFE2DA1985A1035B89" },
   { name = "testcontainers", version = "1.14.1", build_tools = ["mix"], requirements = ["ecto", "ecto_sql", "fs", "hackney", "jason", "tesla", "uniq"], otp_app = "testcontainers", source = "hex", outer_checksum = "4CFCA95679E50EB96CCC634386C919A0BE37B507275BDB5972CB022B6664A072" },
-  { name = "testcontainers_gleam", version = "2.0.0", build_tools = ["gleam"], requirements = ["envoy", "gleam_erlang", "gleam_stdlib", "testcontainers"], source = "git", repo = "https://github.com/veeso/testcontainers-gleam.git", commit = "a994649193082188e2a0688010e363179205a4e3" },
+  { name = "testcontainers_gleam", version = "2.0.0", build_tools = ["gleam"], requirements = ["envoy", "gleam_erlang", "gleam_stdlib", "testcontainers"], otp_app = "testcontainers_gleam", source = "hex", outer_checksum = "46518D5E5758D451728E306FC966A7B5B9AFC8E873BA4FA5A91999C10938A52C" },
   { name = "unicode_util_compat", version = "0.7.1", build_tools = ["rebar3"], requirements = [], otp_app = "unicode_util_compat", source = "hex", outer_checksum = "B3A917854CE3AE233619744AD1E0102E05673136776FB2FA76234F3E03B23642" },
   { name = "uniq", version = "0.6.2", build_tools = ["mix"], requirements = ["ecto"], otp_app = "uniq", source = "hex", outer_checksum = "95AA2A41EA331EF0A52D8ED12D3E730EF9AF9DBC30F40646E6AF334FBD7BC0FC" },
 ]
 
 [requirements]
+envoy = { version = ">= 1.1.0 and < 2.0.0" }
 gleam_erlang = { version = ">= 1.3.0 and < 2.0.0" }
 gleam_otp = { version = ">= 1.2.0 and < 2.0.0" }
 gleam_regexp = { version = ">= 1.1.1 and < 2.0.0" }
@@ -39,4 +40,4 @@ gleeunit = { version = ">= 1.0.0 and < 2.0.0" }
 gtempo = { version = ">= 7.2.4 and < 8.0.0" }
 kafein = { version = ">= 2.0.0 and < 3.0.0" }
 mug = { version = ">= 3.1.0 and < 4.0.0" }
-testcontainers_gleam = { git = "https://github.com/veeso/testcontainers-gleam.git", ref = "a9946491" }
+testcontainers_gleam = { version = ">= 2.0.0 and < 3.0.0" }
