@@ -67,6 +67,7 @@ pub type DataStream {
   /// Contains the SSL socket and the underlying TCP socket.
   /// The TCP socket is necessary in case we want to switch back to a plain TCP stream.
   Ssl(ssl: kafein.SslSocket, tcp: mug.Socket)
+  /// Contains only the TCP socket for plain, unencrypted communication.
   Tcp(socket: mug.Socket)
 }
 
@@ -99,7 +100,7 @@ pub fn receive(stream: DataStream, timeout: Int) -> Result(BitArray, mug.Error) 
 /// Errors if the socket is closed, if the timeout is reached, or if any other error occurs during the receive operation.
 /// The error is returned as a [`mug.Error`]. In case of success, it returns the received data as a `BitArray`.
 pub fn receive_exact(
-  stream,
+  stream: DataStream,
   size: Int,
   timeout: Int,
 ) -> Result(BitArray, mug.Error) {

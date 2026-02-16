@@ -5,14 +5,17 @@
 import gftp.{type FtpClient}
 import gftp/internal/command
 import gftp/response.{type Response}
-import gftp/result.{type FtpResult} as _ftp_result
+import gftp/result.{type FtpError} as _ftp_result
 import gftp/status.{type Status}
 import gftp/stream.{type DataStream}
 import gleam/option.{type Option}
 import gleam/result
 
 /// Open a data channel for downloading a file.
-pub fn open_retr(ftp_client: FtpClient, path: String) -> FtpResult(DataStream) {
+pub fn open_retr(
+  ftp_client: FtpClient,
+  path: String,
+) -> Result(DataStream, FtpError) {
   use data_stream <- result.try(gftp.data_command(
     ftp_client,
     command.Retr(path),
@@ -27,7 +30,10 @@ pub fn open_retr(ftp_client: FtpClient, path: String) -> FtpResult(DataStream) {
 }
 
 /// Open a data channel for uploading a file.
-pub fn open_stor(ftp_client: FtpClient, path: String) -> FtpResult(DataStream) {
+pub fn open_stor(
+  ftp_client: FtpClient,
+  path: String,
+) -> Result(DataStream, FtpError) {
   use data_stream <- result.try(gftp.data_command(
     ftp_client,
     command.Stor(path),
@@ -42,7 +48,10 @@ pub fn open_stor(ftp_client: FtpClient, path: String) -> FtpResult(DataStream) {
 }
 
 /// Open a data channel for appending to a file.
-pub fn open_appe(ftp_client: FtpClient, path: String) -> FtpResult(DataStream) {
+pub fn open_appe(
+  ftp_client: FtpClient,
+  path: String,
+) -> Result(DataStream, FtpError) {
   use data_stream <- result.try(gftp.data_command(
     ftp_client,
     command.Appe(path),
@@ -60,7 +69,7 @@ pub fn open_appe(ftp_client: FtpClient, path: String) -> FtpResult(DataStream) {
 pub fn open_list(
   ftp_client: FtpClient,
   pathname: Option(String),
-) -> FtpResult(DataStream) {
+) -> Result(DataStream, FtpError) {
   use data_stream <- result.try(gftp.data_command(
     ftp_client,
     command.List(pathname),
@@ -78,7 +87,7 @@ pub fn open_list(
 pub fn open_nlst(
   ftp_client: FtpClient,
   pathname: Option(String),
-) -> FtpResult(DataStream) {
+) -> Result(DataStream, FtpError) {
   use data_stream <- result.try(gftp.data_command(
     ftp_client,
     command.Nlst(pathname),
@@ -96,7 +105,7 @@ pub fn open_nlst(
 pub fn open_mlsd(
   ftp_client: FtpClient,
   pathname: Option(String),
-) -> FtpResult(DataStream) {
+) -> Result(DataStream, FtpError) {
   use data_stream <- result.try(gftp.data_command(
     ftp_client,
     command.Mlsd(pathname),
@@ -115,7 +124,7 @@ pub fn open_data_command(
   ftp_client: FtpClient,
   command_str: String,
   expected_statuses: List(Status),
-) -> FtpResult(#(DataStream, Response)) {
+) -> Result(#(DataStream, Response), FtpError) {
   use data_stream <- result.try(gftp.data_command(
     ftp_client,
     command.Custom(command_str),
@@ -131,6 +140,6 @@ pub fn open_data_command(
 pub fn close_data_channel(
   ftp_client: FtpClient,
   data_stream: DataStream,
-) -> FtpResult(Nil) {
+) -> Result(Nil, FtpError) {
   gftp.finalize_data_command(ftp_client, data_stream)
 }

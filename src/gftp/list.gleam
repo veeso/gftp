@@ -42,7 +42,6 @@
 //// let assert Ok(files) = gleam_list.try_map(lines, list.parse_list)
 //// ```
 
-import gftp/internal/utils.{re_matches}
 import gftp/list/file.{type File}
 import gftp/list/file_type.{type FileType}
 import gftp/list/permission.{type FilePermissions, FilePermissions}
@@ -65,18 +64,35 @@ const dos_list_regex = "^(\\d{2}\\-\\d{2}\\-\\d{2}\\s+\\d{2}:\\d{2}\\s*[AP]M)\\s
 
 /// Collapse multiple consecutive whitespace characters into a single space.
 fn normalize_whitespace(input: String) -> String {
-  let assert Ok(re) = regexp.from_string("\\s+")
-  regexp.replace(re, input, " ")
+  case regexp.from_string("\\s+") {
+    Ok(re) -> regexp.replace(re, input, " ")
+    // The regex is a compile-time constant and always valid
+    Error(_) -> input
+  }
 }
 
-/// The result of parsing a line from a `LIST`, `MLSD`, or `MLST` command output.
-pub type ParseResult =
-  Result(File, ParseError)
+/// Match a regular expression against a string and extract submatches.
+fn re_matches(
+  re: regexp.Regexp,
+  line: String,
+) -> Result(List(Option(String)), Nil) {
+  case regexp.scan(re, line) {
+    [] -> Error(Nil)
+    matches ->
+      matches
+      |> list.map(fn(match) { match.submatches })
+      |> list.flatten()
+      |> Ok
+  }
+}
 
 /// The possible errors that can occur when parsing a line from a `LIST`, `MLSD`, or `MLST` command output.
 pub type ParseError {
+  /// The line does not conform to expected LIST, MLSD, or MLST format.
   SyntaxError
+  /// The date field could not be parsed.
   InvalidDate
+  /// The size field is not a valid unsigned integer.
   BadSize
 }
 
@@ -95,7 +111,7 @@ pub fn describe_error(error: ParseError) -> String {
 /// let line = "type=file;size=1024;modify=20200105134600; readme.txt"
 /// let assert Ok(f) = list.parse_mlsd(line)
 /// ```
-pub fn parse_mlsd(line: String) -> ParseResult {
+pub fn parse_mlsd(line: String) -> Result(File, ParseError) {
   parse_mlsd_mlst_line(line)
 }
 
@@ -105,7 +121,7 @@ pub fn parse_mlsd(line: String) -> ParseResult {
 /// let line = "type=file;size=2048;modify=20210315120000; document.pdf"
 /// let assert Ok(f) = list.parse_mlst(line)
 /// ```
-pub fn parse_mlst(line: String) -> ParseResult {
+pub fn parse_mlst(line: String) -> Result(File, ParseError) {
   parse_mlsd_mlst_line(line)
 }
 
@@ -120,9 +136,16 @@ pub fn parse_mlst(line: String) -> ParseResult {
 /// // DOS format
 /// let assert Ok(f) = list.parse_list("10-19-20  03:19PM       403 readme.txt")
 /// ```
-pub fn parse_list(line: String) -> ParseResult {
-  let assert Ok(posix_re) = regexp.from_string(posix_list_regex)
-  let assert Ok(dos_re) = regexp.from_string(dos_list_regex)
+pub fn parse_list(line: String) -> Result(File, ParseError) {
+  // Both regexes are compile-time constants and always valid
+  use posix_re <- result.try(
+    regexp.from_string(posix_list_regex)
+    |> result.replace_error(SyntaxError),
+  )
+  use dos_re <- result.try(
+    regexp.from_string(dos_list_regex)
+    |> result.replace_error(SyntaxError),
+  )
 
   line
   |> parse_list_posix(posix_re)
@@ -156,7 +179,11 @@ fn parse_mlsd_mlst_permissions(
 }
 
 /// Parse a single token in a `key=value` pair from a `MLSD` or `MLST` line, updating the given `File` data structure with the extracted metadata on success, or returning a `ParseError` on failure.
-fn parse_mlsd_mlst_token(key: String, value: String, file: File) -> ParseResult {
+fn parse_mlsd_mlst_token(
+  key: String,
+  value: String,
+  file: File,
+) -> Result(File, ParseError) {
   case string.lowercase(key) {
     "type" ->
       case string.lowercase(value) {
@@ -196,7 +223,10 @@ fn parse_mlsd_mlst_token(key: String, value: String, file: File) -> ParseResult 
 }
 
 /// Parse MLSD and MLST tokens, split by `;`
-fn parse_mlsd_mlst_tokens(tokens: List(String), file: File) -> ParseResult {
+fn parse_mlsd_mlst_tokens(
+  tokens: List(String),
+  file: File,
+) -> Result(File, ParseError) {
   case tokens {
     [] -> Ok(file)
     [filename] ->
@@ -216,7 +246,7 @@ fn parse_mlsd_mlst_tokens(tokens: List(String), file: File) -> ParseResult {
 
 /// Parse any line from a `MLSD` or `MLST` command output,
 /// returning a `File` data structure with the extracted metadata on success, or a `ParseError` on failure.
-fn parse_mlsd_mlst_line(line: String) -> ParseResult {
+fn parse_mlsd_mlst_line(line: String) -> Result(File, ParseError) {
   case string.trim(line) {
     "" -> Error(SyntaxError)
     trimmed ->
@@ -380,7 +410,7 @@ fn try_parse_int(s: String) -> Option(Int) {
 /// {FILE_TYPE}{PERMISSIONS} {LINK_COUNT} {USER} {GROUP} {FILE_SIZE} {MODIFIED_TIME} {FILENAME}
 /// -rw-r--r-- 1 user group 1234 Nov 5 13:46 example.txt
 /// ```
-fn parse_list_posix(line: String, re: regexp.Regexp) -> ParseResult {
+fn parse_list_posix(line: String, re: regexp.Regexp) -> Result(File, ParseError) {
   case re_matches(re, line) {
     Ok([
       Some(ft_str),
@@ -432,7 +462,7 @@ fn parse_list_posix(line: String, re: regexp.Regexp) -> ParseResult {
 /// 10-19-20  03:19PM <DIR> pub
 /// 04-08-14  03:09PM 403   readme.txt
 /// ```
-fn parse_list_dos(line: String, re: regexp.Regexp) -> ParseResult {
+fn parse_list_dos(line: String, re: regexp.Regexp) -> Result(File, ParseError) {
   case re_matches(re, line) {
     Ok([Some(modified), file_type, size, Some(name)]) -> {
       use modified <- result.try(
