@@ -164,24 +164,13 @@ fn with_actor_connection(callback: fn(ftp_actor.Handle) -> Nil) -> Nil {
       // Set up TLS inside the running container (install certs, start vsftpd on port 990)
       setup_ftps(container_id)
 
-      let assert Ok(port) = container.mapped_port(container, 990)
       let ssl_options =
         kafein.default_options
         |> kafein.verify(kafein.VerifyNone)
       let assert Ok(client) =
-        gftp.connect_timeout("127.0.0.1", port, timeout: 30_000)
+        gftp.connect_timeout("127.0.0.1", 21, timeout: 30_000)
         |> result.try(fn(client) { gftp.into_secure(client, ssl_options) })
 
-      let client =
-        gftp.with_passive_stream_builder(client, fn(host, port) {
-          // get mapped port for data
-          let assert Ok(data_port) = container.mapped_port(container, port)
-
-          mug.new(host, data_port)
-          |> mug.connect()
-          |> result.map_error(ftp_result.ConnectionError)
-          |> result.map(stream.Tcp)
-        })
       let assert Ok(started) = ftp_actor.start(client)
       let handle = started.data
       let assert Ok(_) = ftp_actor.login(handle, "test", "test")
@@ -221,7 +210,14 @@ fn setup_ftps(container_id: String) -> Nil
 /// setup function to create a Docker container with an FTP server for active mode testing.
 /// Uses --network host so the server can connect back to the client's listener on 127.
 fn alpine_ftp_active_container() -> Container {
-  alpine_ftp_container()
+  "delfer/alpine-ftp-server:latest"
+  |> container.new()
+  |> container.with_environment("MIN_PORT", "21100")
+  |> container.with_environment("MAX_PORT", "21110")
+  |> container.with_environment("USERS", "test|test|/home/test")
+  |> container.with_environment("ADDRESS", "127.0.0.1")
+  |> container.with_waiting_strategy(wait_strategy.log("passwd:", 30_000, 500))
+  |> container.with_auto_remove(True)
   |> container.with_network_mode("host")
 }
 
